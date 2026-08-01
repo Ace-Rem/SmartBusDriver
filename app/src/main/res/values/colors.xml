@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="md3_primary">#0B63CE</color>
+    <color name="md3_primary_bright">#1A7AE8</color>
+    <color name="md3_on_primary">#FFFFFFFF</color>
+    <color name="md3_primary_container">#D8E8FF</color>
+    <color name="md3_primary_container_soft">#EAF3FF</color>
+    <color name="md3_on_primary_container">#001B3D</color>
+    <color name="md3_secondary">#52637A</color>
+    <color name="md3_on_secondary">#FFFFFFFF</color>
+    <color name="md3_secondary_container">#E4EAF2</color>
+    <color name="md3_on_secondary_container">#1B2736</color>
+    <color name="md3_background">#F3F6FA</color>
+    <color name="md3_on_background">#172033</color>
+    <color name="md3_surface">#FFFFFFFF</color>
+    <color name="md3_on_surface">#172033</color>
+    <color name="md3_surface_variant">#E8EEF7</color>
+    <color name="md3_on_surface_variant">#5D6A7C</color>
+    <color name="md3_outline">#D7DEE9</color>
+    <color name="smartbus_success">#19A65A</color>
+    <color name="smartbus_on_success">#FFFFFFFF</color>
+    <color name="smartbus_success_container">#DDF8E8</color>
+    <color name="smartbus_warning">#F59E0B</color>
+    <color name="smartbus_warning_container">#FFF2D6</color>
+    <color name="smartbus_error">#D93025</color>
+    <color name="smartbus_error_container">#FFE1DE</color>
+    <color name="smartbus_map_water">#DCEBFF</color>
+    <color name="smartbus_map_road">#FFFFFF</color>
+    <color name="smartbus_shadow">#220B2445</color>
+    <color name="smartbus_divider">#D7DEE9</color>
+    <color name="smartbus_overlay">#CCF3F6FA</color>
+    <color name="smartbus_scrim">#66172033</color>
+    <color name="smartbus_bottom_nav">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

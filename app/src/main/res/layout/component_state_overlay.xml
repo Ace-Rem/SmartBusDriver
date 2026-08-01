@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/stateOverlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:animateLayoutChanges="true"
+    android:background="@color/smartbus_overlay"
+    android:clickable="true"
+    android:focusable="true"
+    android:visibility="gone">
+
+    <LinearLayout
+        android:id="@+id/loadingState"
+        android:layout_width="@dimen/state_panel_width"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_card"
+        android:elevation="@dimen/elevation_card_raised"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="@dimen/spacing_xl">
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/loadingProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:indeterminate="true"
+            app:indicatorColor="@color/md3_primary"
+            app:trackColor="@color/md3_primary_container" />
+
+        <TextView
+            android:id="@+id/loadingText"
+            style="@style/TextAppearance.Smartbus.Body"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_sm"
+            android:text="@string/loading_default" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/emptyState"
+        android:layout_width="@dimen/state_panel_width"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_card"
+        android:elevation="@dimen/elevation_card_raised"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="@dimen/spacing_xl"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="@dimen/icon_lg"
+            android:layout_height="@dimen/icon_lg"
+            android:contentDescription="@string/empty_default"
+            android:src="@drawable/ic_bus"
+            app:tint="@color/md3_primary" />
+
+        <TextView
+            android:id="@+id/emptyTitle"
+            style="@style/TextAppearance.Smartbus.Title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_sm"
+            android:gravity="center"
+            android:text="@string/empty_default" />
+
+        <TextView
+            android:id="@+id/emptyMessage"
+            style="@style/TextAppearance.Smartbus.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_xs"
+            android:gravity="center"
+            android:text="@string/empty_default" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/errorState"
+        android:layout_width="@dimen/state_panel_width"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_card"
+        android:elevation="@dimen/elevation_card_raised"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="@dimen/spacing_xl"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="@dimen/icon_lg"
+            android:layout_height="@dimen/icon_lg"
+            android:contentDescription="@string/error_default"
+            android:src="@drawable/ic_warning"
+            app:tint="@color/smartbus_error" />
+
+        <TextView
+            android:id="@+id/errorTitle"
+            style="@style/TextAppearance.Smartbus.Title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_sm"
+            android:gravity="center"
+            android:text="@string/error_default" />
+
+        <TextView
+            android:id="@+id/errorMessage"
+            style="@style/TextAppearance.Smartbus.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_xs"
+            android:gravity="center"
+            android:text="@string/error_default" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/retryButton"
+            style="@style/Widget.Smartbus.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_md"
+            android:text="@string/retry_action" />
+    </LinearLayout>
+</FrameLayout>

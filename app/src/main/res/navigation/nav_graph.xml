@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/tripFragment">
+
+    <fragment
+        android:id="@+id/tripFragment"
+        android:name="com.smartbus.driver.ui.TripFragment"
+        android:label="@string/nav_dashboard" />
+
+    <fragment
+        android:id="@+id/googleMapFragment"
+        android:name="com.smartbus.driver.ui.GoogleMapFragment"
+        android:label="@string/nav_map" />
+
+    <fragment
+        android:id="@+id/routeFragment"
+        android:name="com.smartbus.driver.ui.RouteFragment"
+        android:label="@string/route_title" />
+
+    <fragment
+        android:id="@+id/passengerRecordFragment"
+        android:name="com.smartbus.driver.ui.PassengerRecordFragment"
+        android:label="@string/add_passenger_title" />
+
+    <fragment
+        android:id="@+id/tripHistoryFragment"
+        android:name="com.smartbus.driver.ui.TripHistoryFragment"
+        android:label="@string/nav_history" />
+
+    <fragment
+        android:id="@+id/driverProfileFragment"
+        android:name="com.smartbus.driver.ui.DriverProfileFragment"
+        android:label="@string/nav_profile" />
+
+    <fragment
+        android:id="@+id/aiAssistantFragment"
+        android:name="com.smartbus.driver.ui.AiAssistantFragment"
+        android:label="@string/ai_title" />
+</navigation>

@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/md3_background">
+
+    <org.osmdroid.views.MapView
+        android:id="@+id/osmMapView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:id="@+id/mapTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_margin="@dimen/spacing_sm"
+        android:background="@drawable/bg_card"
+        android:elevation="@dimen/elevation_card"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="@dimen/spacing_sm">
+
+        <ImageView
+            android:layout_width="@dimen/icon_md"
+            android:layout_height="@dimen/icon_md"
+            android:contentDescription="@string/map_vehicle"
+            android:src="@drawable/ic_bus"
+            app:tint="@color/md3_primary" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_xs"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/mapVehicleTextView"
+                style="@style/TextAppearance.Smartbus.Subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/map_vehicle"
+                android:textColor="@color/md3_on_surface"
+                tools:text="Xe đang chạy" />
+
+            <TextView
+                android:id="@+id/mapStatusTextView"
+                style="@style/TextAppearance.Smartbus.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/map_status"
+                android:textColor="@color/md3_on_surface_variant"
+                tools:text="OpenStreetMap" />
+        </LinearLayout>
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/mapProgress"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:indeterminate="true"
+            android:visibility="gone"
+            app:indicatorColor="@color/md3_primary"
+            app:indicatorSize="24dp"
+            app:trackThickness="3dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/mapBottomPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_bottom_sheet"
+        android:clickable="true"
+        android:elevation="@dimen/elevation_card_raised"
+        android:focusable="true"
+        android:orientation="vertical"
+        android:paddingHorizontal="@dimen/spacing_md"
+        android:paddingBottom="@dimen/spacing_sm"
+        app:behavior_draggable="true"
+        app:behavior_fitToContents="true"
+        app:behavior_hideable="false"
+        app:behavior_peekHeight="@dimen/map_sheet_peek_height"
+        app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
+
+        <FrameLayout
+            android:id="@+id/mapSheetHandleArea"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="@dimen/spacing_sm"
+            android:paddingBottom="@dimen/spacing_xs">
+
+            <View
+                android:id="@+id/mapSheetHandle"
+                android:layout_width="48dp"
+                android:layout_height="5dp"
+                android:layout_gravity="center_horizontal"
+                android:background="@drawable/bg_sheet_handle"
+                android:contentDescription="@string/map_sheet_drag_hint" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/mapSheetHintTextView"
+            style="@style/TextAppearance.Smartbus.Caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingBottom="@dimen/spacing_xxs"
+            android:text="@string/map_sheet_drag_hint"
+            android:textColor="@color/md3_on_surface_variant" />
+
+        <TextView
+            style="@style/TextAppearance.Smartbus.Label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/map_next_stop"
+            android:textColor="@color/md3_on_surface_variant" />
+
+        <TextView
+            android:id="@+id/mapNextStopTextView"
+            style="@style/TextAppearance.Smartbus.Title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/placeholder_dash"
+            android:textColor="@color/md3_on_surface"
+            tools:text="Nhà hát Thành phố" />
+
+        <TextView
+            android:id="@+id/mapEtaTextView"
+            style="@style/TextAppearance.Smartbus.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/map_eta_label"
+            android:textColor="@color/md3_on_surface_variant"
+            tools:text="Còn ~7 phút (320 m)" />
+
+        <TextView
+            android:id="@+id/mapCurrentStopTextView"
+            style="@style/TextAppearance.Smartbus.Caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/placeholder_dash"
+            android:textColor="@color/md3_on_surface_variant"
+            tools:text="Bến hiện tại: Công viên 23/9" />
+
+        <TextView
+            android:id="@+id/mapAttributionTextView"
+            style="@style/TextAppearance.Smartbus.Caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/map_osm_attribution"
+            android:textColor="@color/md3_on_surface_variant" />
+
+        <LinearLayout
+            android:id="@+id/mapActionsRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_xs"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/centerVehicleButton"
+                style="@style/Widget.Smartbus.Button.Primary"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:text="@string/map_center_action"
+                app:icon="@drawable/ic_gps" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/showRouteButton"
+                style="@style/Widget.Smartbus.Button.Secondary"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:text="@string/map_route_action"
+                app:icon="@drawable/ic_route" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/mapStopsTitleTextView"
+            style="@style/TextAppearance.Smartbus.Label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_xs"
+            android:text="@string/route_stops_title"
+            android:textColor="@color/md3_on_surface" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/stopsRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginTop="4dp"
+            android:clipToPadding="false"
+            android:nestedScrollingEnabled="false"
+            tools:itemCount="4"
+            tools:listitem="@layout/item_stop" />
+    </LinearLayout>
+
+    <include
+        layout="@layout/component_state_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/snackbarAnchor"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="@dimen/map_sheet_peek_height"
+        android:contentDescription="@string/state_snackbar_anchor" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

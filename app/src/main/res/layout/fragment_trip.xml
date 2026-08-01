@@ -1,0 +1,486 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:animateLayoutChanges="true"
+    android:background="@color/md3_background">
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/dashboardScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingBottom="@dimen/spacing_md">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/spacing_md">
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Smartbus.Card.Primary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="@color/md3_primary">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_primary_gradient"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_lg">
+
+                    <TextView
+                        style="@style/TextAppearance.Smartbus.Label"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/dashboard_greeting"
+                        android:textColor="@color/md3_primary_container" />
+
+                    <TextView
+                        android:id="@+id/driverNameTextView"
+                        style="@style/TextAppearance.Smartbus.Display"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xxs"
+                        android:text="@string/placeholder_dash"
+                        android:textColor="@color/md3_on_primary"
+                        tools:text="Nguyễn Văn Minh" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:contentDescription="@string/route_label"
+                            android:src="@drawable/ic_route"
+                            app:tint="@color/md3_primary_container" />
+
+                        <TextView
+                            android:id="@+id/routeValueTextView"
+                            style="@style/TextAppearance.Smartbus.Body"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/spacing_xs"
+                            android:layout_weight="1"
+                            android:text="@string/placeholder_dash"
+                            android:textColor="@color/md3_primary_container"
+                            tools:text="BX01 - Bến xe Trung tâm" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:baselineAligned="false"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="72dp"
+                            android:layout_marginEnd="@dimen/spacing_xs"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_soft_blue"
+                            android:gravity="center_vertical"
+                            android:orientation="vertical"
+                            android:padding="@dimen/spacing_sm">
+
+                            <TextView
+                                style="@style/TextAppearance.Smartbus.Label"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/trip_time_label"
+                                android:textColor="@color/md3_on_primary_container"
+                                android:textSize="11sp" />
+
+                            <TextView
+                                android:id="@+id/tripTimeTextView"
+                                style="@style/TextAppearance.Smartbus.Caption"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/placeholder_dash"
+                                android:textColor="@color/md3_on_primary_container"
+                                android:textSize="13sp"
+                                tools:text="06:30 - 08:15" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="72dp"
+                            android:layout_marginStart="@dimen/spacing_xs"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_soft_success"
+                            android:gravity="center_vertical"
+                            android:orientation="vertical"
+                            android:padding="@dimen/spacing_sm">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <ImageView
+                                    android:layout_width="14dp"
+                                    android:layout_height="14dp"
+                                    android:contentDescription="@string/gps_label"
+                                    android:src="@drawable/ic_gps"
+                                    app:tint="@color/smartbus_success" />
+
+                                <TextView
+                                    style="@style/TextAppearance.Smartbus.Label"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:text="@string/gps_label"
+                                    android:textColor="@color/md3_on_primary_container"
+                                    android:textSize="11sp" />
+                            </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/gpsStatusTextView"
+                                style="@style/TextAppearance.Smartbus.Caption"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/gps_value_searching"
+                                android:textColor="@color/smartbus_success"
+                                android:textSize="13sp"
+                                tools:text="Đã sẵn sàng" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Smartbus.Card"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:minHeight="112dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="@dimen/spacing_md"
+                        android:paddingVertical="@dimen/spacing_sm">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:contentDescription="@string/passenger_total_label"
+                            android:src="@drawable/ic_passenger"
+                            app:tint="@color/md3_primary" />
+
+                        <TextView
+                            android:id="@+id/passengerTotalTextView"
+                            style="@style/TextAppearance.Smartbus.Headline"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="@string/placeholder_dash"
+                            android:textSize="28sp"
+                            tools:text="28" />
+
+                        <TextView
+                            style="@style/TextAppearance.Smartbus.Label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:ellipsize="end"
+                            android:maxLines="2"
+                            android:text="@string/passenger_total_label"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Smartbus.Card"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:minHeight="112dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="@dimen/spacing_md"
+                        android:paddingVertical="@dimen/spacing_sm">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:contentDescription="@string/dropoff_label"
+                            android:src="@drawable/ic_stop"
+                            app:tint="@color/smartbus_error" />
+
+                        <TextView
+                            android:id="@+id/dropoffCountTextView"
+                            style="@style/TextAppearance.Smartbus.Headline"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="@string/placeholder_dash"
+                            android:textSize="28sp"
+                            tools:text="6" />
+
+                        <TextView
+                            style="@style/TextAppearance.Smartbus.Label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:ellipsize="end"
+                            android:maxLines="2"
+                            android:text="@string/dropoff_label"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Smartbus.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal"
+                    android:padding="@dimen/spacing_md">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.Smartbus.Label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/current_stop_label" />
+
+                        <TextView
+                            android:id="@+id/currentStopTextView"
+                            style="@style/TextAppearance.Smartbus.Subtitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/placeholder_dash"
+                            tools:text="Công viên 23/9" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="56dp"
+                        android:layout_marginHorizontal="@dimen/spacing_sm"
+                        android:background="@color/smartbus_divider" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.Smartbus.Label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/next_stop_label" />
+
+                        <TextView
+                            android:id="@+id/nextStopTextView"
+                            style="@style/TextAppearance.Smartbus.Subtitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/placeholder_dash"
+                            tools:text="Nhà hát Thành phố" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                app:cardBackgroundColor="@color/smartbus_warning_container"
+                app:cardCornerRadius="@dimen/radius_lg"
+                app:cardElevation="2dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="@dimen/spacing_md">
+
+                    <ImageView
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
+                        android:background="@drawable/bg_soft_warning"
+                        android:contentDescription="@string/notification_label"
+                        android:padding="6dp"
+                        android:src="@drawable/ic_notification"
+                        app:tint="@color/smartbus_warning" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/spacing_sm"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.Smartbus.Label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/notification_label"
+                            android:textColor="@color/md3_on_surface" />
+
+                        <TextView
+                            android:id="@+id/notificationTextView"
+                            style="@style/TextAppearance.Smartbus.Body"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/notification_placeholder" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                style="@style/TextAppearance.Smartbus.Headline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_md"
+                android:text="@string/quick_actions_label" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/startTripButton"
+                    style="@style/Widget.Smartbus.Button.Success"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height_large"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:maxLines="2"
+                    android:text="@string/action_start_trip"
+                    android:textColor="@color/smartbus_on_success"
+                    app:icon="@drawable/ic_play"
+                    app:iconTint="@color/smartbus_on_success" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/addPassengerButton"
+                    style="@style/Widget.Smartbus.Button.Primary"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height_large"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:maxLines="2"
+                    android:text="@string/action_add_passenger"
+                    android:textColor="@color/md3_on_primary"
+                    app:icon="@drawable/ic_add"
+                    app:iconTint="@color/md3_on_primary" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/endTripButton"
+                    style="@style/Widget.Smartbus.Button.Danger"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height_large"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:maxLines="2"
+                    android:text="@string/action_end_trip"
+                    android:textColor="@color/smartbus_error"
+                    app:icon="@drawable/ic_stop"
+                    app:iconTint="@color/smartbus_error" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/aiAssistantButton"
+                    style="@style/Widget.Smartbus.Button.Secondary"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height_large"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:maxLines="2"
+                    android:text="@string/action_ai_assistant"
+                    android:textColor="@color/md3_primary"
+                    app:icon="@drawable/ic_ai"
+                    app:iconTint="@color/md3_primary" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/openMapButton"
+                style="@style/Widget.Smartbus.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/button_height"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:text="@string/action_open_map"
+                app:icon="@drawable/ic_map" />
+
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/dashboardProgress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:indeterminate="true"
+                android:visibility="gone"
+                app:indicatorColor="@color/md3_primary"
+                app:trackColor="@color/md3_primary_container" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <include layout="@layout/component_state_overlay" />
+
+    <View
+        android:id="@+id/snackbarAnchor"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:contentDescription="@string/state_snackbar_anchor" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

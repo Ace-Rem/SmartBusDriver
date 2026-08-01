@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/spacing_xs"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/aiMessageBubble"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_soft_blue"
+        android:orientation="horizontal"
+        android:padding="@dimen/spacing_sm">
+
+        <ImageView
+            android:id="@+id/aiMessageIcon"
+            android:layout_width="@dimen/icon_md"
+            android:layout_height="@dimen/icon_md"
+            android:contentDescription="@string/ai_title"
+            android:src="@drawable/ic_ai"
+            app:tint="@color/md3_primary" />
+
+        <TextView
+            android:id="@+id/aiMessageText"
+            style="@style/TextAppearance.Smartbus.Body"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_xs"
+            android:layout_weight="1"
+            android:text="@string/ai_welcome"
+            android:textColor="@color/md3_on_surface"
+            tools:text="Xin chào tài xế" />
+    </LinearLayout>
+</LinearLayout>

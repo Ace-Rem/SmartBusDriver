@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:animateLayoutChanges="true"
+    android:background="@color/md3_background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="@dimen/spacing_md">
+
+        <include layout="@layout/component_screen_toolbar" />
+
+        <TextView
+            style="@style/TextAppearance.Smartbus.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_xxs"
+            android:text="@string/ai_subtitle"
+            android:textColor="@color/md3_on_surface_variant" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.Smartbus.Card"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="@dimen/spacing_sm"
+            android:layout_weight="1"
+            app:cardCornerRadius="@dimen/radius_xl"
+            app:cardElevation="@dimen/elevation_card">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="@dimen/spacing_md">
+
+                <include layout="@layout/item_ai_message" />
+
+                <TextView
+                    style="@style/TextAppearance.Smartbus.Label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/spacing_sm"
+                    android:text="@string/ai_suggestions_label" />
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/spacing_xs"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/aiSuggestionTrafficButton"
+                            style="@style/Widget.Smartbus.Button.Chip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/ai_suggestion_traffic" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/aiSuggestionSafetyButton"
+                            style="@style/Widget.Smartbus.Button.Chip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/spacing_xs"
+                            android:text="@string/ai_suggestion_safety" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/aiSuggestionPassengerButton"
+                            style="@style/Widget.Smartbus.Button.Chip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/spacing_xs"
+                            android:text="@string/ai_suggestion_passenger" />
+                    </LinearLayout>
+                </HorizontalScrollView>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/aiMessagesRecyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="@dimen/spacing_sm"
+                    android:layout_weight="1"
+                    tools:itemCount="2"
+                    tools:listitem="@layout/item_ai_message" />
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/aiProgress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:indeterminate="true"
+                    android:visibility="gone"
+                    app:indicatorColor="@color/md3_primary"
+                    app:trackColor="@color/md3_primary_container" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_sm"
+            android:background="@drawable/bg_input_surface"
+            android:elevation="2dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="@dimen/spacing_xs">
+
+            <EditText
+                android:id="@+id/aiPromptEditText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="@string/ai_prompt_hint"
+                android:importantForAutofill="no"
+                android:inputType="textMultiLine"
+                android:maxLines="3"
+                android:minHeight="48dp"
+                android:paddingHorizontal="@dimen/spacing_xs"
+                android:textColor="@color/md3_on_surface"
+                android:textColorHint="@color/md3_on_surface_variant" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/sendAiButton"
+                style="@style/Widget.Smartbus.Button.Primary"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:contentDescription="@string/send_action"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:padding="0dp"
+                app:icon="@drawable/ic_send"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <include layout="@layout/component_state_overlay" />
+
+    <View
+        android:id="@+id/snackbarAnchor"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:contentDescription="@string/state_snackbar_anchor" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

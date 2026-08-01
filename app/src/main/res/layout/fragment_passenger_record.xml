@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:animateLayoutChanges="true"
+    android:background="@color/md3_background">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/spacing_md">
+
+            <TextView
+                style="@style/TextAppearance.Smartbus.Display"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/add_passenger_title" />
+
+            <TextView
+                style="@style/TextAppearance.Smartbus.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_xxs"
+                android:text="@string/add_passenger_subtitle" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Smartbus.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_md"
+                app:cardCornerRadius="@dimen/radius_xl"
+                app:cardElevation="@dimen/elevation_card_raised">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_lg">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/passengerCountInputLayout"
+                        style="@style/Widget.Smartbus.TextInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/passenger_count_hint"
+                        app:startIconDrawable="@drawable/ic_passenger"
+                        app:startIconTint="@color/md3_primary">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/passengerCountEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="number"
+                            android:minHeight="52dp" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/pickupStopInputLayout"
+                        style="@style/Widget.Smartbus.TextInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:hint="@string/pickup_stop_hint"
+                        app:startIconDrawable="@drawable/ic_route"
+                        app:startIconTint="@color/md3_primary">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/pickupStopEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text"
+                            android:minHeight="52dp" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/dropoffStopInputLayout"
+                        style="@style/Widget.Smartbus.TextInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:hint="@string/dropoff_stop_hint"
+                        app:startIconDrawable="@drawable/ic_stop"
+                        app:startIconTint="@color/smartbus_error">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/dropoffStopEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text"
+                            android:minHeight="52dp" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/passengerNoteInputLayout"
+                        style="@style/Widget.Smartbus.TextInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:hint="@string/note_hint">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/passengerNoteEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="top"
+                            android:inputType="textMultiLine"
+                            android:minLines="3" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/savePassengerButton"
+                        style="@style/Widget.Smartbus.Button.Primary"
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/button_height_large"
+                        android:layout_marginTop="@dimen/spacing_lg"
+                        android:text="@string/save_passenger"
+                        app:icon="@drawable/ic_add" />
+
+                    <com.google.android.material.progressindicator.LinearProgressIndicator
+                        android:id="@+id/passengerProgress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:indeterminate="true"
+                        android:visibility="gone"
+                        app:indicatorColor="@color/md3_primary"
+                        app:trackColor="@color/md3_primary_container" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <include layout="@layout/component_state_overlay" />
+
+    <View
+        android:id="@+id/snackbarAnchor"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:contentDescription="@string/state_snackbar_anchor" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

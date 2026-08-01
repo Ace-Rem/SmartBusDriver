@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="@dimen/spacing_xs"
+    style="@style/Widget.Smartbus.Card">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="70dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/spacing_sm">
+
+        <TextView
+            android:id="@+id/stopOrderTextView"
+            style="@style/TextAppearance.Smartbus.Label"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_soft_blue"
+            android:gravity="center"
+            android:text="@string/placeholder_dash"
+            android:textColor="@color/md3_primary"
+            tools:text="01" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_sm"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/stopNameTextView"
+                style="@style/TextAppearance.Smartbus.Subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/placeholder_dash"
+                tools:text="Công viên 23/9" />
+
+            <TextView
+                android:id="@+id/stopTimeTextView"
+                style="@style/TextAppearance.Smartbus.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/stop_time_label"
+                tools:text="06:45" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="@dimen/icon_sm"
+            android:layout_height="@dimen/icon_sm"
+            android:contentDescription="@string/route_stops_title"
+            android:src="@drawable/ic_place"
+            app:tint="@color/md3_primary" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingBottom="@dimen/spacing_xs">
+
+    <TextView
+        android:id="@+id/sectionTitle"
+        style="@style/TextAppearance.Smartbus.Headline"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="@string/dashboard_title"
+        tools:text="Tiêu đề mục" />
+
+    <TextView
+        android:id="@+id/sectionAction"
+        style="@style/TextAppearance.Smartbus.Label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/md3_primary"
+        android:visibility="gone"
+        tools:text="Xem tất cả"
+        tools:visibility="visible" />
+</LinearLayout>

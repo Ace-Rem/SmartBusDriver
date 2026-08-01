@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/tripFragment"
+        android:icon="@drawable/ic_dashboard"
+        android:title="@string/nav_dashboard" />
+    <item
+        android:id="@+id/googleMapFragment"
+        android:icon="@drawable/ic_map"
+        android:title="@string/nav_map" />
+    <item
+        android:id="@+id/tripHistoryFragment"
+        android:icon="@drawable/ic_history"
+        android:title="@string/nav_history" />
+    <item
+        android:id="@+id/driverProfileFragment"
+        android:icon="@drawable/ic_person"
+        android:title="@string/nav_profile" />
+</menu>

@@ -1,0 +1,93 @@
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { stream -> localProperties.load(stream) }
+}
+
+// Prefer local.properties, then Gradle -P/API_BASE_URL, then emulator default.
+def resolveApiBaseUrl = { String fallback ->
+    def fromLocal = localProperties.getProperty("API_BASE_URL")
+    if (fromLocal != null && !fromLocal.trim().isEmpty()) {
+        return fromLocal.trim()
+    }
+    def fromProject = project.findProperty("API_BASE_URL")
+    if (fromProject != null && !fromProject.toString().trim().isEmpty()) {
+        return fromProject.toString().trim()
+    }
+    return fallback
+}
+
+android {
+    namespace 'com.smartbus.driver'
+    compileSdk {
+        version = release(36) {
+            minorApiLevel = 1
+        }
+    }
+
+    defaultConfig {
+        applicationId "com.smartbus.driver"
+        minSdk 28
+        targetSdk 36
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders = [
+                usesCleartextTraffic: "false"
+        ]
+    }
+
+    buildTypes {
+        debug {
+            // Render: set API_BASE_URL=https://YOUR-SERVICE.onrender.com/api/ in local.properties
+            def apiBaseUrl = resolveApiBaseUrl("http://10.0.2.2:8080/api/")
+            buildConfigField "String", "BASE_URL", "\"${apiBaseUrl}\""
+            // Cleartext only needed for local emulator/LAN HTTP; HTTPS Render does not need it.
+            boolean needsCleartext = apiBaseUrl.startsWith("http://")
+            manifestPlaceholders.usesCleartextTraffic = needsCleartext ? "true" : "false"
+        }
+        release {
+            optimization {
+                enable false
+            }
+            def apiBaseUrl = resolveApiBaseUrl("https://api.smartbus.example/api/")
+            buildConfigField "String", "BASE_URL", "\"${apiBaseUrl}\""
+            manifestPlaceholders.usesCleartextTraffic = "false"
+        }
+    }
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation libs.appcompat
+    implementation libs.material
+    implementation libs.activity
+    implementation libs.constraintlayout
+    implementation libs.lifecycle.viewmodel
+    implementation libs.lifecycle.livedata
+    implementation libs.navigation.fragment
+    implementation libs.navigation.ui
+    implementation libs.recyclerview
+    implementation libs.retrofit
+    implementation libs.retrofit.gson
+    implementation libs.okhttp.logging
+    implementation libs.room.runtime
+    annotationProcessor libs.room.compiler
+    implementation libs.osmdroid
+    implementation libs.location
+    testImplementation libs.junit
+    androidTestImplementation libs.espresso.core
+    androidTestImplementation libs.ext.junit
+}

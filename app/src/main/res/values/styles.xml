@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TextAppearance.Smartbus.Display" parent="TextAppearance.Material3.HeadlineLarge">
+        <item name="android:textColor">@color/md3_on_surface</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.01</item>
+    </style>
+
+    <style name="TextAppearance.Smartbus.Headline" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:textColor">@color/md3_on_surface</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Smartbus.Title" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textColor">@color/md3_on_surface</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Smartbus.Subtitle" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textColor">@color/md3_on_surface</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="TextAppearance.Smartbus.Label" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textColor">@color/md3_on_surface_variant</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.02</item>
+    </style>
+
+    <style name="TextAppearance.Smartbus.Body" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">@color/md3_on_surface_variant</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+    </style>
+
+    <style name="TextAppearance.Smartbus.Caption" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:textColor">@color/md3_on_surface_variant</item>
+    </style>
+
+    <style name="Widget.Smartbus.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">@color/md3_surface</item>
+        <item name="cardCornerRadius">@dimen/radius_lg</item>
+        <item name="cardElevation">@dimen/elevation_card</item>
+        <item name="strokeColor">@color/smartbus_divider</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <style name="Widget.Smartbus.Card.Primary" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">@color/md3_primary</item>
+        <item name="cardCornerRadius">@dimen/radius_xl</item>
+        <item name="cardElevation">@dimen/elevation_card_raised</item>
+        <item name="strokeWidth">0dp</item>
+    </style>
+
+    <style name="Widget.Smartbus.Button.Primary" parent="Widget.Material3.Button">
+        <item name="cornerRadius">@dimen/radius_md</item>
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="backgroundTint">@color/button_primary_bg</item>
+        <item name="android:textColor">@color/button_primary_text</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="iconTint">@color/button_primary_text</item>
+        <item name="iconPadding">10dp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:alpha">1</item>
+    </style>
+
+    <style name="Widget.Smartbus.Button.Secondary" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="cornerRadius">@dimen/radius_md</item>
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="strokeColor">@color/md3_primary</item>
+        <item name="strokeWidth">1.5dp</item>
+        <item name="android:textColor">@color/button_secondary_text</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="iconTint">@color/button_secondary_text</item>
+        <item name="iconPadding">10dp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:alpha">1</item>
+    </style>
+
+    <style name="Widget.Smartbus.Button.Success" parent="Widget.Material3.Button">
+        <item name="cornerRadius">@dimen/radius_md</item>
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="backgroundTint">@color/button_success_bg</item>
+        <item name="android:textColor">@color/button_success_text</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="iconTint">@color/button_success_text</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:alpha">1</item>
+    </style>
+
+    <style name="Widget.Smartbus.Button.Danger" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="cornerRadius">@dimen/radius_md</item>
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="strokeColor">@color/button_danger_text</item>
+        <item name="android:textColor">@color/button_danger_text</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="iconTint">@color/button_danger_text</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:alpha">1</item>
+    </style>
+
+    <style name="Widget.Smartbus.Button.Chip" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="cornerRadius">999dp</item>
+        <item name="android:minHeight">42dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="strokeColor">@color/md3_primary_container</item>
+        <item name="android:textColor">@color/md3_primary</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:paddingLeft">14dp</item>
+        <item name="android:paddingRight">14dp</item>
+        <item name="android:letterSpacing">0</item>
+    </style>
+
+    <style name="Widget.Smartbus.TextInput" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxCornerRadiusTopStart">@dimen/radius_md</item>
+        <item name="boxCornerRadiusTopEnd">@dimen/radius_md</item>
+        <item name="boxCornerRadiusBottomStart">@dimen/radius_md</item>
+        <item name="boxCornerRadiusBottomEnd">@dimen/radius_md</item>
+        <item name="boxStrokeColor">@color/md3_primary</item>
+        <item name="boxStrokeWidth">1.5dp</item>
+        <item name="hintTextColor">@color/md3_on_surface_variant</item>
+        <item name="boxBackgroundColor">@color/md3_surface</item>
+    </style>
+
+    <style name="Widget.Smartbus.BottomNavigation" parent="Widget.Material3.BottomNavigationView">
+        <item name="itemIconTint">@color/bottom_nav_color</item>
+        <item name="itemTextColor">@color/bottom_nav_color</item>
+        <item name="itemActiveIndicatorStyle">@style/Widget.Smartbus.BottomNav.ActiveIndicator</item>
+        <item name="itemRippleColor">@color/md3_primary_container</item>
+        <item name="android:background">@color/smartbus_bottom_nav</item>
+        <item name="elevation">@dimen/elevation_bottom_nav</item>
+        <item name="labelVisibilityMode">labeled</item>
+        <item name="itemPaddingTop">6dp</item>
+        <item name="itemPaddingBottom">10dp</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="android:minHeight">@dimen/bottom_nav_height</item>
+        <item name="android:clipChildren">false</item>
+        <item name="android:clipToPadding">false</item>
+    </style>
+
+    <style name="Widget.Smartbus.BottomNav.ActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/md3_primary_container</item>
+        <item name="android:width">56dp</item>
+        <item name="android:height">32dp</item>
+    </style>
+
+    <style name="ShapeAppearance.Smartbus.Card" parent="ShapeAppearance.Material3.MediumComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/radius_lg</item>
+    </style>
+</resources>

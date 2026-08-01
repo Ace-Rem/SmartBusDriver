@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/metric_card_height"
+    style="@style/Widget.Smartbus.Card">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:padding="@dimen/spacing_md">
+
+        <ImageView
+            android:id="@+id/metricIcon"
+            android:layout_width="@dimen/icon_md"
+            android:layout_height="@dimen/icon_md"
+            android:contentDescription="@string/app_name"
+            android:src="@drawable/ic_passenger"
+            app:tint="@color/md3_primary" />
+
+        <TextView
+            android:id="@+id/metricValue"
+            style="@style/TextAppearance.Smartbus.Display"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_xs"
+            android:text="@string/placeholder_dash"
+            tools:text="28" />
+
+        <TextView
+            android:id="@+id/metricLabel"
+            style="@style/TextAppearance.Smartbus.Label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/passenger_total_label" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

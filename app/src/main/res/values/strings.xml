@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SmartBus</string>
+
+    <string name="nav_dashboard">Điều khiển</string>
+    <string name="nav_map">Bản đồ</string>
+    <string name="nav_history">Lịch sử</string>
+    <string name="nav_profile">Hồ sơ</string>
+
+    <string name="splash_title">SmartBus Driver</string>
+    <string name="splash_subtitle">Sẵn sàng cho chuyến xe an toàn</string>
+    <string name="splash_loading">Đang khởi tạo…</string>
+
+    <string name="login_title">Đăng nhập tài xế</string>
+    <string name="login_subtitle">Theo dõi chuyến xe, hành khách và lộ trình trong một nơi.</string>
+    <string name="username_hint">Tên đăng nhập</string>
+    <string name="password_hint">Mật khẩu</string>
+    <string name="login_action">Đăng nhập</string>
+    <string name="remember_driver">Ghi nhớ tài xế</string>
+    <string name="forgot_password">Quên mật khẩu?</string>
+
+    <string name="loading_default">Đang tải dữ liệu…</string>
+    <string name="empty_default">Chưa có dữ liệu để hiển thị</string>
+    <string name="empty_history">Chưa có chuyến nào được ghi nhận</string>
+    <string name="empty_ai">Hãy đặt câu hỏi để bắt đầu</string>
+    <string name="error_default">Không thể tải dữ liệu</string>
+    <string name="retry_action">Thử lại</string>
+    <string name="dialog_title">Xác nhận thao tác</string>
+    <string name="dialog_message">Vui lòng kiểm tra thông tin trước khi tiếp tục.</string>
+    <string name="dialog_cancel">Hủy</string>
+    <string name="dialog_confirm">Đồng ý</string>
+    <string name="state_snackbar_anchor">Thông báo nhanh</string>
+    <string name="placeholder_dash">—</string>
+
+    <string name="dashboard_title">Bảng điều khiển</string>
+    <string name="dashboard_greeting">Xin chào tài xế</string>
+    <string name="driver_name_label">Tên tài xế</string>
+    <string name="route_label">Tuyến</string>
+    <string name="trip_time_label">Thời gian chuyến</string>
+    <string name="gps_label">GPS</string>
+    <string name="gps_value_ready">Đã sẵn sàng</string>
+    <string name="gps_value_searching">Đang tìm tín hiệu</string>
+    <string name="passenger_total_label">Tổng hành khách</string>
+    <string name="current_stop_label">Bến hiện tại</string>
+    <string name="next_stop_label">Bến tiếp theo</string>
+    <string name="dropoff_label">Khách sẽ xuống</string>
+    <string name="notification_label">Thông báo</string>
+    <string name="notification_placeholder">Chưa có thông báo mới</string>
+    <string name="quick_actions_label">Thao tác nhanh</string>
+    <string name="action_back">Quay lại</string>
+    <string name="action_start_trip">Bắt đầu chuyến</string>
+    <string name="action_add_passenger">Thêm khách</string>
+    <string name="action_end_trip">Kết thúc chuyến</string>
+    <string name="action_ai_assistant">Trợ lý AI</string>
+    <string name="action_open_map">Mở bản đồ</string>
+
+    <string name="map_title">Bản đồ chuyến xe</string>
+    <string name="map_status">Đang theo dõi tuyến</string>
+    <string name="map_osm_status">OpenStreetMap · không cần API key</string>
+    <string name="map_osm_attribution">© OpenStreetMap contributors</string>
+    <string name="map_sheet_drag_hint">Kéo xuống để mở rộng bản đồ · kéo lên để xem thông tin</string>
+    <string name="map_sheet_drag_up_hint">Kéo lên để xem lại thông tin chuyến</string>
+    <string name="map_no_active_trip">Chưa có chuyến đang chạy</string>
+    <string name="map_vehicle">Xe hiện tại</string>
+    <string name="map_next_stop">Điểm đến kế tiếp</string>
+    <string name="map_eta_label">Thời gian dự kiến</string>
+    <string name="map_center_action">Định vị xe</string>
+    <string name="map_route_action">Xem tuyến</string>
+    <string name="map_current_stop_format">Bến hiện tại: %1$s</string>
+    <string name="map_current_stop_unknown">Chưa xác định bến hiện tại</string>
+    <string name="route_stops_title">Các bến trên tuyến</string>
+    <string name="route_title">Tuyến đường</string>
+    <string name="stop_time_label">Giờ dự kiến</string>
+    <string name="stop_status_current">Bến hiện tại</string>
+    <string name="stop_status_next">Bến tiếp theo</string>
+    <string name="trip_already_active">Đã có chuyến đang chạy. Hãy kết thúc trước.</string>
+    <string name="trip_required_for_passenger">Hãy bắt đầu chuyến trước khi thêm hành khách.</string>
+    <string name="trip_required_for_end">Chưa có chuyến đang chạy để kết thúc.</string>
+    <string name="location_permission_title">Cần quyền vị trí</string>
+    <string name="location_permission_message">SmartBus cần quyền vị trí để gửi GPS và hiển thị xe trên bản đồ khi chuyến đang chạy.</string>
+    <string name="location_open_settings">Mở Cài đặt</string>
+
+    <string name="add_passenger_title">Thêm hành khách</string>
+    <string name="add_passenger_subtitle">Ghi nhận nhanh khi khách lên xe</string>
+    <string name="passenger_count_hint">Số lượng hành khách</string>
+    <string name="pickup_stop_hint">Bến lên</string>
+    <string name="dropoff_stop_hint">Bến xuống</string>
+    <string name="note_hint">Ghi chú</string>
+    <string name="save_passenger">Lưu hành khách</string>
+
+    <string name="history_title">Lịch sử chuyến</string>
+    <string name="history_subtitle">Các chuyến đã hoàn thành gần đây</string>
+    <string name="history_today">Hôm nay</string>
+    <string name="history_completed">Đã hoàn thành</string>
+    <string name="history_running">Đang chạy</string>
+    <string name="history_distance">Quãng đường</string>
+    <string name="history_passengers">Hành khách</string>
+    <string name="history_duration">Thời lượng</string>
+    <string name="history_duration_format">Thời lượng: %1$s</string>
+    <string name="history_passengers_format">%1$d khách</string>
+
+    <string name="profile_title">Hồ sơ tài xế</string>
+    <string name="profile_subtitle">Thông tin cá nhân và trạng thái chuyến</string>
+    <string name="profile_license">Giấy phép lái xe</string>
+    <string name="profile_phone">Số điện thoại</string>
+    <string name="profile_rating">Đánh giá</string>
+    <string name="profile_shift">Ca làm việc</string>
+    <string name="profile_vehicle">Xe phụ trách</string>
+    <string name="profile_trip_status">Trạng thái</string>
+    <string name="profile_passenger_metric">Hành khách</string>
+    <string name="profile_current_stop">Bến hiện tại</string>
+    <string name="profile_trip_active">Đang chạy</string>
+    <string name="profile_trip_idle">Sẵn sàng</string>
+    <string name="profile_no_current_stop">Chưa có bến</string>
+    <string name="profile_logout">Đăng xuất</string>
+
+    <string name="ai_title">Trợ lý AI</string>
+    <string name="ai_subtitle">Hỏi nhanh về chuyến xe, an toàn và hành khách.</string>
+    <string name="ai_welcome">Tôi có thể hỗ trợ tóm tắt chuyến, nhắc kiểm tra an toàn hoặc gợi ý xử lý tình huống.</string>
+    <string name="ai_prompt_hint">Nhập câu hỏi về chuyến xe…</string>
+    <string name="ai_suggestion_traffic">Tình hình tuyến hiện tại?</string>
+    <string name="ai_suggestion_safety">Nhắc tôi kiểm tra an toàn</string>
+    <string name="ai_suggestion_passenger">Tóm tắt hành khách</string>
+    <string name="send_action">Gửi</string>
+    <string name="ai_suggestions_label">Gợi ý nhanh</string>
+
+    <string name="dialog_end_trip_message">Bạn có chắc muốn kết thúc chuyến hiện tại?</string>
+    <string name="route_select_prompt">Chọn một tuyến để bắt đầu chuyến</string>
+    <string name="route_confirm_start">Nhấn Bắt đầu chuyến để xác nhận tuyến đã chọn</string>
+    <string name="map_api_key_missing">Bản đồ dùng OpenStreetMap, không cần Google Maps API key.</string>
+    <string name="map_api_key_invalid">Không tải được tiles OpenStreetMap. Kiểm tra kết nối mạng.</string>
+    <string name="map_distance_format">Cách bến gần nhất %1$d m</string>
+</resources>
