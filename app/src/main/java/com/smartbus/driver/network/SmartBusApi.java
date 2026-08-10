@@ -4,6 +4,8 @@ import com.smartbus.driver.model.AiAssistantRequest;
 import com.smartbus.driver.model.AiAssistantResponse;
 import com.smartbus.driver.model.AiSummaryRequest;
 import com.smartbus.driver.model.ApiResponse;
+import com.smartbus.driver.model.BoardingRequestModel;
+import com.smartbus.driver.model.BootstrapModel;
 import com.smartbus.driver.model.CreatePassengerRecordRequest;
 import com.smartbus.driver.model.CreateTripRequest;
 import com.smartbus.driver.model.DriverModel;
@@ -33,6 +35,9 @@ public interface SmartBusApi {
 
     @GET("drivers/{id}")
     Call<ApiResponse<DriverModel>> getDriverById(@Path("id") long id);
+
+    @GET("sync/bootstrap")
+    Call<ApiResponse<BootstrapModel>> bootstrap();
 
     @GET("routes")
     Call<ApiResponse<List<RouteModel>>> getRoutes();
@@ -72,6 +77,12 @@ public interface SmartBusApi {
 
     @GET("passenger-records")
     Call<ApiResponse<List<PassengerRecordModel>>> getPassengerRecords(@Query("tripId") long tripId);
+
+    @GET("boarding-requests")
+    Call<ApiResponse<List<BoardingRequestModel>>> getBoardingRequests(@Query("tripId") long tripId);
+
+    @POST("boarding-requests/{id}/confirm-boarding")
+    Call<ApiResponse<BoardingRequestModel>> confirmBoarding(@Path("id") long requestId);
 
     @POST("ai/chat")
     Call<ApiResponse<AiAssistantResponse>> aiChat(@Body AiAssistantRequest request);

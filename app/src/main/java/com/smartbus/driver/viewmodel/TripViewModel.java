@@ -8,6 +8,7 @@ import androidx.lifecycle.MutableLiveData;
 import com.smartbus.driver.SmartBusApp;
 import com.smartbus.driver.gps.GpsManager;
 import com.smartbus.driver.model.DashboardState;
+import com.smartbus.driver.model.BoardingRequestModel;
 import com.smartbus.driver.model.DriverModel;
 import com.smartbus.driver.model.LocalLocation;
 import com.smartbus.driver.model.PassengerRecordModel;
@@ -16,6 +17,8 @@ import com.smartbus.driver.model.StopModel;
 import com.smartbus.driver.model.TripModel;
 import com.smartbus.driver.model.UpdateLocationResponse;
 import com.smartbus.driver.repository.AuthRepository;
+import com.smartbus.driver.repository.BoardingRequestRepository;
+import com.smartbus.driver.repository.BootstrapRepository;
 import com.smartbus.driver.repository.PassengerRecordRepository;
 import com.smartbus.driver.repository.RouteRepository;
 import com.smartbus.driver.repository.TripRepository;
@@ -33,8 +36,10 @@ public class TripViewModel extends AndroidViewModel {
 
     private final AuthRepository authRepository;
     private final TripRepository tripRepository;
+    private final BootstrapRepository bootstrapRepository;
     private final RouteRepository routeRepository;
     private final PassengerRecordRepository passengerRecordRepository;
+    private final BoardingRequestRepository boardingRequestRepository;
     private final GpsManager gpsManager;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean locationUpdateInFlight = new AtomicBoolean(false);
@@ -48,6 +53,8 @@ public class TripViewModel extends AndroidViewModel {
     private final MutableLiveData<LocalLocation> localLocation = new MutableLiveData<>();
     private final MutableLiveData<List<StopModel>> stopsState = new MutableLiveData<>();
     private final MutableLiveData<String> gpsMessage = new MutableLiveData<>();
+    private final MutableLiveData<UiState<List<BoardingRequestModel>>> boardingRequestsState =
+            new MutableLiveData<>(UiState.idle());
 
     private final Object dashboardLock = new Object();
     private DashboardState currentDashboard = new DashboardState();
@@ -58,8 +65,10 @@ public class TripViewModel extends AndroidViewModel {
         SmartBusApp app = (SmartBusApp) application;
         authRepository = new AuthRepository(app.getTokenManager(), app.getDatabase());
         tripRepository = new TripRepository(app.getDatabase().tripDao());
+        bootstrapRepository = new BootstrapRepository(app.getDatabase());
         routeRepository = new RouteRepository(app.getDatabase().routeDao(), app.getDatabase().stopDao());
         passengerRecordRepository = new PassengerRecordRepository(app.getDatabase().passengerRecordDao());
+        boardingRequestRepository = new BoardingRequestRepository();
         gpsManager = new GpsManager(application);
     }
 
@@ -87,6 +96,10 @@ public class TripViewModel extends AndroidViewModel {
         return gpsMessage;
     }
 
+    public LiveData<UiState<List<BoardingRequestModel>>> getBoardingRequestsState() {
+        return boardingRequestsState;
+    }
+
     public GpsManager getGpsManager() {
         return gpsManager;
     }
@@ -106,6 +119,7 @@ public class TripViewModel extends AndroidViewModel {
             dashboardState.setValue(UiState.loading());
         }
         executor.execute(() -> {
+            bootstrapRepository.sync();
             DashboardState state = new DashboardState();
             DriverModel driver = authRepository.getCachedDriver();
             Result<DriverModel> meResult = authRepository.getMe();
@@ -187,6 +201,8 @@ public class TripViewModel extends AndroidViewModel {
                     state.setPassengerTotal(passengerRecordRepository.getCachedPassengerTotal(trip.getId()));
                 }
 
+                loadBoardingRequests(trip.getId(), false);
+
                 state.setGpsStatus(gpsManager.hasLocationPermission()
                         ? (gpsManager.isTracking() ? "Đang gửi mỗi 5 giây" : "Đã sẵn sàng")
                         : "Cần quyền vị trí");
@@ -198,6 +214,7 @@ public class TripViewModel extends AndroidViewModel {
             } else {
                 state.setGpsStatus(gpsManager.hasLocationPermission() ? "Đã sẵn sàng" : "Cần quyền vị trí");
                 state.setNotification("Chưa có chuyến đang chạy");
+                boardingRequestsState.postValue(UiState.success(null));
                 stopsState.postValue(null);
             }
 
@@ -206,6 +223,10 @@ public class TripViewModel extends AndroidViewModel {
             }
             dashboardState.postValue(UiState.success(state));
         });
+    }
+
+    public void preloadTripHistory() {
+        executor.execute(tripRepository::syncHistory);
     }
 
     public void startTrip(long routeId) {
@@ -228,16 +249,35 @@ public class TripViewModel extends AndroidViewModel {
 
     public void endTrip() {
         actionState.setValue(UiState.loading());
+        clearActiveTripLocally("Đang kết thúc chuyến...");
         executor.execute(() -> {
             Result<TripModel> result = tripRepository.endCurrentTrip();
             if (result.isSuccess()) {
-                stopGpsTracking();
                 actionState.postValue(UiState.success(result.getData(), "Đã kết thúc chuyến"));
                 loadDashboard(false);
             } else {
                 actionState.postValue(UiState.error(result.getMessage()));
+                loadDashboard(false);
             }
         });
+    }
+
+    private void clearActiveTripLocally(String notification) {
+        stopGpsTracking();
+        DashboardState next = new DashboardState();
+        DashboardState previous;
+        synchronized (dashboardLock) {
+            previous = currentDashboard;
+            next.setDriver(previous.getDriver());
+            next.setGpsStatus(gpsManager.hasLocationPermission() ? "Đã sẵn sàng" : "Cần quyền vị trí");
+            next.setNotification(notification);
+            next.setTracking(false);
+            currentDashboard = next;
+        }
+        cachedStops = null;
+        stopsState.postValue(null);
+        boardingRequestsState.postValue(UiState.success(null));
+        dashboardState.postValue(UiState.success(next));
     }
 
     public void startGpsTracking() {
@@ -310,6 +350,43 @@ public class TripViewModel extends AndroidViewModel {
                 currentDashboard.setPassengerTotal(total);
                 currentDashboard.setPassengersAlighting(alighting);
                 dashboardState.postValue(UiState.success(currentDashboard));
+            }
+        });
+    }
+
+    public void refreshBoardingRequests() {
+        DashboardState snapshot = getCurrentDashboard();
+        if (snapshot.getTrip() == null || snapshot.getTrip().getId() == null) {
+            boardingRequestsState.setValue(UiState.success(null));
+            return;
+        }
+        loadBoardingRequests(snapshot.getTrip().getId(), true);
+    }
+
+    public void confirmBoardingRequest(long requestId) {
+        actionState.setValue(UiState.loading());
+        executor.execute(() -> {
+            Result<BoardingRequestModel> result = boardingRequestRepository.confirmBoarding(requestId);
+            if (result.isSuccess()) {
+                actionState.postValue(UiState.success(null, "Đã xác nhận hành khách lên xe"));
+                refreshPassengerTotal();
+                refreshBoardingRequests();
+            } else {
+                actionState.postValue(UiState.error(result.getMessage()));
+            }
+        });
+    }
+
+    private void loadBoardingRequests(long tripId, boolean showLoading) {
+        if (showLoading) {
+            boardingRequestsState.postValue(UiState.loading());
+        }
+        executor.execute(() -> {
+            Result<List<BoardingRequestModel>> result = boardingRequestRepository.listByTrip(tripId);
+            if (result.isSuccess()) {
+                boardingRequestsState.postValue(UiState.success(result.getData()));
+            } else {
+                boardingRequestsState.postValue(UiState.error(result.getMessage()));
             }
         });
     }

@@ -129,6 +129,22 @@ public class TripRepository {
     }
 
     public Result<List<TripModel>> getHistory() {
+        Result<List<TripModel>> result = syncHistory();
+        if (result.isSuccess()) {
+            return result;
+        }
+        List<TripModel> cached = getCachedHistory();
+        if (!cached.isEmpty()) {
+            return Result.success(cached);
+        }
+        return result;
+    }
+
+    public List<TripModel> getCachedHistory() {
+        return EntityMapper.toTripModels(tripDao.getAll());
+    }
+
+    public Result<List<TripModel>> syncHistory() {
         try {
             Response<ApiResponse<List<TripModel>>> response = api.getTripHistory().execute();
             Result<List<TripModel>> result = ApiResponseParser.parse(response);
@@ -144,10 +160,6 @@ public class TripRepository {
             }
             return result;
         } catch (IOException exception) {
-            List<TripModel> cached = EntityMapper.toTripModels(tripDao.getAll());
-            if (!cached.isEmpty()) {
-                return Result.success(cached);
-            }
             return ApiResponseParser.fromThrowable(exception);
         }
     }

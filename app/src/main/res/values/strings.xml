@@ -46,10 +46,14 @@
     <string name="dropoff_label">Khách sẽ xuống</string>
     <string name="notification_label">Thông báo</string>
     <string name="notification_placeholder">Chưa có thông báo mới</string>
+    <string name="boarding_requests_label">Yêu cầu lên xe</string>
+    <string name="boarding_requests_empty">Chưa có yêu cầu mới cho chuyến này</string>
+    <string name="boarding_request_confirm">Xác nhận lên xe</string>
     <string name="quick_actions_label">Thao tác nhanh</string>
     <string name="action_back">Quay lại</string>
     <string name="action_start_trip">Bắt đầu chuyến</string>
     <string name="action_add_passenger">Thêm khách</string>
+    <string name="action_dropoff_manifest">Khách xuống bến</string>
     <string name="action_end_trip">Kết thúc chuyến</string>
     <string name="action_ai_assistant">Trợ lý AI</string>
     <string name="action_open_map">Mở bản đồ</string>
@@ -130,4 +134,8 @@
     <string name="map_api_key_missing">Bản đồ dùng OpenStreetMap, không cần Google Maps API key.</string>
     <string name="map_api_key_invalid">Không tải được tiles OpenStreetMap. Kiểm tra kết nối mạng.</string>
     <string name="map_distance_format">Cách bến gần nhất %1$d m</string>
+    <string name="dropoff_manifest_title">Khách xuống theo bến</string>
+    <string name="dropoff_manifest_subtitle">Danh sách cập nhật từ các yêu cầu check-in của chuyến hiện tại.</string>
+    <string name="dropoff_manifest_empty">Chưa có khách chọn bến xuống cho chuyến này</string>
+    <string name="dropoff_manifest_refresh">Cập nhật</string>
 </resources>

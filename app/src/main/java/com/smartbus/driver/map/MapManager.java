@@ -1,6 +1,13 @@
 package com.smartbus.driver.map;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Typeface;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.location.Location;
 import com.smartbus.driver.BuildConfig;
 import com.smartbus.driver.model.StopModel;
@@ -31,6 +38,10 @@ public class MapManager {
 
     private static final int COLOR_ROUTE = 0xFF0B63CE;
     private static final int COLOR_TRAIL = 0x990B63CE;
+    private static final int COLOR_SUCCESS = 0xFF19A65A;
+    private static final int COLOR_WARNING = 0xFFE8952B;
+    private static final int COLOR_ERROR = 0xFFC62828;
+    private static final int COLOR_WHITE = 0xFFFFFFFF;
     private static final GeoPoint DEFAULT_CENTER = new GeoPoint(10.7769, 106.7009);
 
     private static final XYTileSource OPEN_STREET_MAP = new XYTileSource(
@@ -51,7 +62,6 @@ public class MapManager {
     private Marker vehicleMarker;
     private final List<Marker> stopMarkers = new ArrayList<>();
     private final Map<Long, Marker> stopMarkerById = new HashMap<>();
-    private Polyline routePolyline;
     private Polyline trailPolyline;
     private final List<GeoPoint> trailPoints = new ArrayList<>();
     /** Only true after user taps "Định vị xe". */
@@ -165,6 +175,7 @@ public class MapManager {
             vehicleMarker = new Marker(mapView);
             vehicleMarker.setTitle("Xe");
             vehicleMarker.setSnippet("Vị trí hiện tại");
+            vehicleMarker.setIcon(createPinDrawable(COLOR_ROUTE, "X"));
             vehicleMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
             vehicleMarker.setFlat(true);
             mapView.getOverlays().add(vehicleMarker);
@@ -263,7 +274,6 @@ public class MapManager {
             return;
         }
 
-        List<GeoPoint> routePoints = new ArrayList<>();
         for (StopModel stop : lastStops) {
             if (stop.getLatitude() == null || stop.getLongitude() == null) {
                 continue;
@@ -279,18 +289,11 @@ public class MapManager {
             if (stop.getId() != null) {
                 stopMarkerById.put(stop.getId(), marker);
             }
-            routePoints.add(point);
         }
 
-        if (!routePoints.isEmpty()) {
-            routePolyline = new Polyline(mapView);
-            routePolyline.setPoints(routePoints);
-            routePolyline.getOutlinePaint().setColor(COLOR_ROUTE);
-            routePolyline.getOutlinePaint().setStrokeWidth(10f);
-            mapView.getOverlays().add(0, routePolyline);
-            if (moveCamera && !routeOverviewActive && !followVehicle) {
-                fitToPoints(routePoints, false);
-            }
+        List<GeoPoint> routePoints = collectRoutePoints();
+        if (moveCamera && !routePoints.isEmpty() && !routeOverviewActive && !followVehicle) {
+            fitToPoints(routePoints, false);
         }
         mapView.invalidate();
     }
@@ -336,13 +339,59 @@ public class MapManager {
     }
 
     private void applyStopStyle(Marker marker, Long stopId) {
+        StopModel stop = findStopById(stopId);
+        int index = stop != null ? lastStops.indexOf(stop) : -1;
         if (stopId != null && stopId.equals(currentStopId)) {
             marker.setSnippet("Bến hiện tại");
+            marker.setIcon(createPinDrawable(COLOR_SUCCESS, "HT"));
         } else if (stopId != null && stopId.equals(nextStopId)) {
             marker.setSnippet("Bến tiếp theo");
+            marker.setIcon(createPinDrawable(COLOR_ROUTE, "TT"));
+        } else if (index == 0) {
+            marker.setSnippet("Bến đầu tuyến");
+            marker.setIcon(createPinDrawable(COLOR_SUCCESS, "Đ"));
+        } else if (index == lastStops.size() - 1) {
+            marker.setSnippet("Bến cuối tuyến");
+            marker.setIcon(createPinDrawable(COLOR_ERROR, "C"));
         } else {
             marker.setSnippet("Bến");
+            marker.setIcon(createPinDrawable(COLOR_WARNING, index >= 0 ? String.valueOf(index + 1) : "B"));
         }
+    }
+
+    private StopModel findStopById(Long stopId) {
+        if (stopId == null) {
+            return null;
+        }
+        for (StopModel stop : lastStops) {
+            if (stopId.equals(stop.getId())) {
+                return stop;
+            }
+        }
+        return null;
+    }
+
+    private Drawable createPinDrawable(int color, String text) {
+        int width = 72;
+        int height = 90;
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Path path = new Path();
+        path.moveTo(width / 2f, height - 4f);
+        path.cubicTo(width * 0.15f, height * 0.55f, 8f, height * 0.38f, 8f, height * 0.25f);
+        path.cubicTo(8f, 8f, width - 8f, 8f, width - 8f, height * 0.25f);
+        path.cubicTo(width - 8f, height * 0.38f, width * 0.85f, height * 0.55f, width / 2f, height - 4f);
+        paint.setColor(color);
+        canvas.drawPath(path, paint);
+        paint.setColor(COLOR_WHITE);
+        canvas.drawCircle(width / 2f, 28f, 21f, paint);
+        paint.setColor(color);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTypeface(Typeface.DEFAULT_BOLD);
+        paint.setTextSize(text.length() > 2 ? 17f : 20f);
+        canvas.drawText(text, width / 2f, 35f, paint);
+        return new BitmapDrawable(mapView.getResources(), bitmap);
     }
 
     private void applyMarkerHighlights() {
@@ -385,12 +434,8 @@ public class MapManager {
             for (Marker marker : stopMarkers) {
                 mapView.getOverlays().remove(marker);
             }
-            if (routePolyline != null) {
-                mapView.getOverlays().remove(routePolyline);
-            }
         }
         stopMarkers.clear();
         stopMarkerById.clear();
-        routePolyline = null;
     }
 }

@@ -11,6 +11,7 @@ import com.smartbus.driver.network.SmartBusApi;
 import com.smartbus.driver.utils.ApiResponseParser;
 import com.smartbus.driver.utils.Result;
 import java.io.IOException;
+import java.util.Map;
 import retrofit2.Response;
 
 public class AiRepository {
@@ -23,9 +24,13 @@ public class AiRepository {
     }
 
     public Result<AiAssistantResponse> chat(long tripId, String question) {
+        return chat(tripId, question, null);
+    }
+
+    public Result<AiAssistantResponse> chat(long tripId, String question, Map<String, Object> clientContext) {
         try {
             Response<ApiResponse<AiAssistantResponse>> response =
-                    api.aiChat(new AiAssistantRequest(tripId, question)).execute();
+                    api.aiChat(new AiAssistantRequest(tripId, question, clientContext)).execute();
             return parseAi(response);
         } catch (IOException exception) {
             return Result.error("Không kết nối được máy chủ AI (" + exception.getClass().getSimpleName()
@@ -34,9 +39,13 @@ public class AiRepository {
     }
 
     public Result<AiAssistantResponse> summary(long tripId) {
+        return summary(tripId, null);
+    }
+
+    public Result<AiAssistantResponse> summary(long tripId, Map<String, Object> clientContext) {
         try {
             Response<ApiResponse<AiAssistantResponse>> response =
-                    api.aiSummary(new AiSummaryRequest(tripId)).execute();
+                    api.aiSummary(new AiSummaryRequest(tripId, clientContext)).execute();
             return parseAi(response);
         } catch (IOException exception) {
             return Result.error("Không kết nối được máy chủ AI (" + exception.getClass().getSimpleName()

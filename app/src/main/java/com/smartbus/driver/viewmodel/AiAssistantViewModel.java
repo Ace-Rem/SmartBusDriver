@@ -16,6 +16,7 @@ import com.smartbus.driver.utils.Result;
 import com.smartbus.driver.utils.UiState;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -49,6 +50,10 @@ public class AiAssistantViewModel extends AndroidViewModel {
     }
 
     public void sendQuestion(Long tripId, String question) {
+        sendQuestion(tripId, question, null);
+    }
+
+    public void sendQuestion(Long tripId, String question, Map<String, Object> clientContext) {
         if (question == null || question.trim().isEmpty()) {
             chatState.setValue(UiState.error("Vui lòng nhập câu hỏi"));
             return;
@@ -62,7 +67,7 @@ public class AiAssistantViewModel extends AndroidViewModel {
                 failChat("Cần có chuyến đang chạy để hỏi AI");
                 return;
             }
-            Result<AiAssistantResponse> result = aiRepository.chat(resolvedTripId, trimmed);
+            Result<AiAssistantResponse> result = aiRepository.chat(resolvedTripId, trimmed, clientContext);
             if (result.isSuccess() && result.getData() != null
                     && result.getData().getAnswer() != null
                     && !result.getData().getAnswer().isBlank()) {
@@ -78,6 +83,10 @@ public class AiAssistantViewModel extends AndroidViewModel {
     }
 
     public void requestSummary(Long tripId) {
+        requestSummary(tripId, null);
+    }
+
+    public void requestSummary(Long tripId, Map<String, Object> clientContext) {
         appendMessage(new AiMessage(AiMessage.TYPE_USER, "Tóm tắt hành khách"));
         chatState.setValue(UiState.loading());
         executor.execute(() -> {
@@ -86,7 +95,7 @@ public class AiAssistantViewModel extends AndroidViewModel {
                 failChat("Cần có chuyến đang chạy để tóm tắt");
                 return;
             }
-            Result<AiAssistantResponse> result = aiRepository.summary(resolvedTripId);
+            Result<AiAssistantResponse> result = aiRepository.summary(resolvedTripId, clientContext);
             if (result.isSuccess() && result.getData() != null
                     && result.getData().getAnswer() != null
                     && !result.getData().getAnswer().isBlank()) {

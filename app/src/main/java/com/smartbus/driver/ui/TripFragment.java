@@ -4,15 +4,18 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.widget.NestedScrollView;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.snackbar.Snackbar;
 import com.smartbus.driver.R;
 import com.smartbus.driver.databinding.FragmentTripBinding;
+import com.smartbus.driver.model.BoardingRequestModel;
 import com.smartbus.driver.model.DashboardState;
 import com.smartbus.driver.model.DriverModel;
 import com.smartbus.driver.model.RouteModel;
@@ -20,6 +23,7 @@ import com.smartbus.driver.model.StopModel;
 import com.smartbus.driver.utils.DateTimeUtils;
 import com.smartbus.driver.utils.UiState;
 import com.smartbus.driver.viewmodel.TripViewModel;
+import java.util.List;
 
 public class TripFragment extends Fragment {
 
@@ -87,6 +91,19 @@ public class TripFragment extends Fragment {
                 ((MainActivity) requireActivity()).navigateTo(R.id.googleMapFragment);
             }
         });
+        binding.dropoffManifestButton.setOnClickListener(v -> {
+            if (!tripViewModel.getCurrentDashboard().hasActiveTrip()) {
+                Snackbar.make(
+                        binding.snackbarAnchor,
+                        R.string.trip_required_for_passenger,
+                        Snackbar.LENGTH_LONG
+                ).show();
+                return;
+            }
+            if (requireActivity() instanceof MainActivity) {
+                ((MainActivity) requireActivity()).navigateTo(R.id.dropoffManifestFragment);
+            }
+        });
 
         tripViewModel.getDashboardState().observe(getViewLifecycleOwner(), this::renderDashboard);
         tripViewModel.getActionState().observe(getViewLifecycleOwner(), state -> {
@@ -109,6 +126,7 @@ public class TripFragment extends Fragment {
                 Snackbar.make(binding.snackbarAnchor, message, Snackbar.LENGTH_SHORT).show();
             }
         });
+        tripViewModel.getBoardingRequestsState().observe(getViewLifecycleOwner(), this::renderBoardingRequests);
     }
 
     @Override
@@ -202,6 +220,79 @@ public class TripFragment extends Fragment {
         binding.endTripButton.setAlpha(active ? 1f : 0.55f);
         binding.addPassengerButton.setEnabled(true);
         binding.addPassengerButton.setAlpha(active ? 1f : 0.55f);
+        binding.dropoffManifestButton.setEnabled(true);
+        binding.dropoffManifestButton.setAlpha(active ? 1f : 0.55f);
+    }
+
+    private void renderBoardingRequests(UiState<List<BoardingRequestModel>> state) {
+        if (binding == null || state == null) {
+            return;
+        }
+        binding.boardingRequestsContainer.removeAllViews();
+        if (state.isLoading()) {
+            binding.boardingRequestsSummaryTextView.setText(R.string.loading_default);
+            return;
+        }
+        if (state.isError()) {
+            binding.boardingRequestsSummaryTextView.setText(
+                    state.getMessage() != null ? state.getMessage() : getString(R.string.error_default)
+            );
+            return;
+        }
+        List<BoardingRequestModel> requests = state.getData();
+        if (requests == null || requests.isEmpty()) {
+            binding.boardingRequestsSummaryTextView.setText(R.string.boarding_requests_empty);
+            return;
+        }
+
+        int pendingCount = 0;
+        for (BoardingRequestModel request : requests) {
+            if ("PENDING".equals(request.getStatus()) || "CONFIRMED".equals(request.getStatus())) {
+                pendingCount++;
+            }
+        }
+        binding.boardingRequestsSummaryTextView.setText(
+                pendingCount > 0
+                        ? pendingCount + " yêu cầu đang chờ xác nhận"
+                        : "Không còn yêu cầu đang chờ"
+        );
+
+        for (BoardingRequestModel request : requests) {
+            View item = LayoutInflater.from(requireContext())
+                    .inflate(R.layout.item_boarding_request, binding.boardingRequestsContainer, false);
+            TextView title = item.findViewById(R.id.boardingRequestTitleTextView);
+            TextView detail = item.findViewById(R.id.boardingRequestDetailTextView);
+            MaterialButton confirm = item.findViewById(R.id.confirmBoardingRequestButton);
+
+            String passengerName = request.getPassenger() != null && request.getPassenger().getFullName() != null
+                    ? request.getPassenger().getFullName()
+                    : getString(R.string.placeholder_dash);
+            String boardingStop = request.getBoardingStop() != null ? request.getBoardingStop().getName() : "-";
+            String destinationStop = request.getDestinationStop() != null ? request.getDestinationStop().getName() : "-";
+            title.setText(passengerName + " · " + request.getStatus());
+            detail.setText("Lên: " + boardingStop
+                    + "\nXuống: " + destinationStop
+                    + "\nBluetooth: " + request.getBluetoothIdentifier());
+
+            boolean canConfirm = "PENDING".equals(request.getStatus()) || "CONFIRMED".equals(request.getStatus());
+            confirm.setVisibility(canConfirm ? View.VISIBLE : View.GONE);
+            confirm.setOnClickListener(v -> confirmBoardingRequest(request));
+            binding.boardingRequestsContainer.addView(item);
+        }
+    }
+
+    private void confirmBoardingRequest(BoardingRequestModel request) {
+        if (request == null || request.getId() == null) {
+            return;
+        }
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.boarding_request_confirm)
+                .setMessage("Xác nhận hành khách đã lên xe qua Bluetooth/request "
+                        + request.getBluetoothIdentifier() + "?")
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .setPositiveButton(R.string.dialog_confirm,
+                        (dialog, which) -> tripViewModel.confirmBoardingRequest(request.getId()))
+                .show();
     }
 
     private void confirmEndTrip() {

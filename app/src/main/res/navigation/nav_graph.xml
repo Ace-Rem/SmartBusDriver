@@ -25,6 +25,11 @@
         android:label="@string/add_passenger_title" />
 
     <fragment
+        android:id="@+id/dropoffManifestFragment"
+        android:name="com.smartbus.driver.ui.DropoffManifestFragment"
+        android:label="@string/dropoff_manifest_title" />
+
+    <fragment
         android:id="@+id/tripHistoryFragment"
         android:name="com.smartbus.driver.ui.TripHistoryFragment"
         android:label="@string/nav_history" />

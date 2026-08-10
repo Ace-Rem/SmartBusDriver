@@ -45,38 +45,60 @@ public class TripHistoryViewModel extends AndroidViewModel {
     }
 
     public void loadHistory() {
-        historyState.setValue(UiState.loading());
+        List<TripHistoryItem> currentItems = historyState.getValue() == null
+                ? null
+                : historyState.getValue().getData();
+        if (currentItems == null || currentItems.isEmpty()) {
+            historyState.setValue(UiState.loading());
+        }
         executor.execute(() -> {
-            Result<List<TripModel>> result = tripRepository.getHistory();
+            List<TripModel> cachedTrips = tripRepository.getCachedHistory();
+            boolean hasCache = cachedTrips != null && !cachedTrips.isEmpty();
+            if (hasCache) {
+                historyState.postValue(UiState.success(buildItems(cachedTrips, true)));
+            }
+
+            Result<List<TripModel>> result = tripRepository.syncHistory();
             if (!result.isSuccess()) {
-                historyState.postValue(UiState.error(result.getMessage()));
+                if (!hasCache) {
+                    historyState.postValue(UiState.error(result.getMessage()));
+                }
                 return;
             }
             List<TripModel> trips = result.getData();
             if (trips == null || trips.isEmpty()) {
-                historyState.postValue(UiState.empty("Chưa có chuyến nào được ghi nhận"));
+                if (!hasCache) {
+                    historyState.postValue(UiState.empty("Chưa có chuyến nào được ghi nhận"));
+                }
                 return;
             }
+            historyState.postValue(UiState.success(buildItems(trips, false)));
+        });
+    }
 
-            Map<Long, String> routeLabels = new HashMap<>();
-            List<TripHistoryItem> items = new ArrayList<>();
-            for (TripModel trip : trips) {
-                String routeLabel = "Tuyến #" + (trip.getRouteId() != null ? trip.getRouteId() : "?");
-                if (trip.getRouteId() != null) {
-                    if (routeLabels.containsKey(trip.getRouteId())) {
-                        routeLabel = routeLabels.get(trip.getRouteId());
-                    } else {
-                        Result<RouteModel> routeResult = routeRepository.getRoute(trip.getRouteId());
-                        if (routeResult.isSuccess() && routeResult.getData() != null) {
-                            RouteModel route = routeResult.getData();
-                            routeLabel = route.getCode() + " - " + route.getName();
-                            routeLabels.put(trip.getRouteId(), routeLabel);
-                        }
+    private List<TripHistoryItem> buildItems(List<TripModel> trips, boolean cacheOnly) {
+        Map<Long, String> routeLabels = new HashMap<>();
+        List<TripHistoryItem> items = new ArrayList<>();
+        for (TripModel trip : trips) {
+            String routeLabel = "Tuyến #" + (trip.getRouteId() != null ? trip.getRouteId() : "?");
+            if (trip.getRouteId() != null) {
+                if (routeLabels.containsKey(trip.getRouteId())) {
+                    routeLabel = routeLabels.get(trip.getRouteId());
+                } else {
+                    Result<RouteModel> routeResult = routeRepository.getRoute(trip.getRouteId());
+                    if (routeResult.isSuccess() && routeResult.getData() != null) {
+                        RouteModel route = routeResult.getData();
+                        routeLabel = route.getCode() + " - " + route.getName();
+                        routeLabels.put(trip.getRouteId(), routeLabel);
                     }
                 }
+            }
 
-                int passengerTotal = 0;
-                if (trip.getId() != null) {
+            int passengerTotal = 0;
+            if (trip.getId() != null) {
+                if (cacheOnly) {
+                    passengerTotal = passengerRecordRepository.getCachedPassengerTotal(trip.getId());
+                } else {
                     Result<List<PassengerRecordModel>> passengers =
                             passengerRecordRepository.getByTrip(trip.getId());
                     if (passengers.isSuccess() && passengers.getData() != null) {
@@ -89,16 +111,16 @@ public class TripHistoryViewModel extends AndroidViewModel {
                         passengerTotal = passengerRecordRepository.getCachedPassengerTotal(trip.getId());
                     }
                 }
-
-                items.add(new TripHistoryItem(
-                        trip,
-                        routeLabel,
-                        passengerTotal,
-                        DateTimeUtils.formatDuration(trip.getStartedAt(), trip.getEndedAt())
-                ));
             }
-            historyState.postValue(UiState.success(items));
-        });
+
+            items.add(new TripHistoryItem(
+                    trip,
+                    routeLabel,
+                    passengerTotal,
+                    DateTimeUtils.formatDuration(trip.getStartedAt(), trip.getEndedAt())
+            ));
+        }
+        return items;
     }
 
     @Override

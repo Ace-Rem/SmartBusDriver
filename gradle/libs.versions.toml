@@ -13,7 +13,6 @@ recyclerview = "1.4.0"
 retrofit = "3.0.0"
 okhttp = "5.2.1"
 room = "2.8.3"
-maps = "19.2.0"
 location = "21.3.0"
 osmdroid = "6.1.20"
 
@@ -35,7 +34,6 @@ retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", ver
 okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "maps" }
 location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "location" }
 osmdroid = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
 

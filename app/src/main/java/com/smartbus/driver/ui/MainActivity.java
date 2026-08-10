@@ -118,6 +118,7 @@ public class MainActivity extends AppCompatActivity {
 
         ensureLocationPermission();
         tripViewModel.loadDashboard();
+        tripViewModel.preloadTripHistory();
         tripViewModel.getDashboardState().observe(this, state -> {
             if (state != null
                     && state.isSuccess()

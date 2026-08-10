@@ -30,6 +30,14 @@ public class RouteRepository {
     }
 
     public Result<List<RouteModel>> getRoutes() {
+        List<RouteModel> cached = EntityMapper.toRouteModels(routeDao.getAll());
+        if (!cached.isEmpty()) {
+            return Result.success(cached);
+        }
+        return syncRoutes();
+    }
+
+    public Result<List<RouteModel>> syncRoutes() {
         try {
             Response<ApiResponse<List<RouteModel>>> response = api.getRoutes().execute();
             Result<List<RouteModel>> result = ApiResponseParser.parse(response);
@@ -45,10 +53,6 @@ public class RouteRepository {
             }
             return result;
         } catch (IOException exception) {
-            List<RouteModel> cached = EntityMapper.toRouteModels(routeDao.getAll());
-            if (!cached.isEmpty()) {
-                return Result.success(cached);
-            }
             return ApiResponseParser.fromThrowable(exception);
         }
     }
@@ -74,6 +78,14 @@ public class RouteRepository {
     }
 
     public Result<List<StopModel>> getStops(long routeId) {
+        List<StopModel> cached = EntityMapper.toStopModels(stopDao.findByRouteId(routeId));
+        if (!cached.isEmpty()) {
+            return Result.success(cached);
+        }
+        return syncStops(routeId);
+    }
+
+    public Result<List<StopModel>> syncStops(long routeId) {
         try {
             Response<ApiResponse<List<StopModel>>> response = api.getStops(routeId).execute();
             Result<List<StopModel>> result = ApiResponseParser.parse(response);
@@ -90,10 +102,6 @@ public class RouteRepository {
             }
             return result;
         } catch (IOException exception) {
-            List<StopModel> cached = EntityMapper.toStopModels(stopDao.findByRouteId(routeId));
-            if (!cached.isEmpty()) {
-                return Result.success(cached);
-            }
             return ApiResponseParser.fromThrowable(exception);
         }
     }

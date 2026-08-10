@@ -8,7 +8,7 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.withInputStream { stream -> localProperties.load(stream) }
 }
 
-// Prefer local.properties, then Gradle -P/API_BASE_URL, then emulator default.
+// Prefer local.properties, then Gradle -P/API_BASE_URL, then Render production default.
 def resolveApiBaseUrl = { String fallback ->
     def fromLocal = localProperties.getProperty("API_BASE_URL")
     if (fromLocal != null && !fromLocal.trim().isEmpty()) {
@@ -44,8 +44,7 @@ android {
 
     buildTypes {
         debug {
-            // Render: set API_BASE_URL=https://YOUR-SERVICE.onrender.com/api/ in local.properties
-            def apiBaseUrl = resolveApiBaseUrl("http://10.0.2.2:8080/api/")
+            def apiBaseUrl = resolveApiBaseUrl("https://smartbus-w5qy.onrender.com/api/")
             buildConfigField "String", "BASE_URL", "\"${apiBaseUrl}\""
             // Cleartext only needed for local emulator/LAN HTTP; HTTPS Render does not need it.
             boolean needsCleartext = apiBaseUrl.startsWith("http://")
@@ -55,7 +54,7 @@ android {
             optimization {
                 enable false
             }
-            def apiBaseUrl = resolveApiBaseUrl("https://api.smartbus.example/api/")
+            def apiBaseUrl = resolveApiBaseUrl("https://smartbus-w5qy.onrender.com/api/")
             buildConfigField "String", "BASE_URL", "\"${apiBaseUrl}\""
             manifestPlaceholders.usesCleartextTraffic = "false"
         }
