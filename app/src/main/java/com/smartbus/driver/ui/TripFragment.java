@@ -70,6 +70,17 @@ public class TripFragment extends Fragment {
             }
             PassengerDialogFragment.show(getParentFragmentManager());
         });
+        binding.scanPassengersButton.setOnClickListener(v -> {
+            if (!tripViewModel.getCurrentDashboard().hasActiveTrip()) {
+                Snackbar.make(
+                        binding.snackbarAnchor,
+                        R.string.trip_required_for_passenger,
+                        Snackbar.LENGTH_LONG
+                ).show();
+                return;
+            }
+            tripViewModel.scanPassengerCheckIns();
+        });
         binding.endTripButton.setOnClickListener(v -> {
             if (!tripViewModel.getCurrentDashboard().hasActiveTrip()) {
                 Snackbar.make(
@@ -104,6 +115,7 @@ public class TripFragment extends Fragment {
                 ((MainActivity) requireActivity()).navigateTo(R.id.dropoffManifestFragment);
             }
         });
+        binding.markDropoffDoneButton.setOnClickListener(v -> tripViewModel.markCurrentDropoffDone());
 
         tripViewModel.getDashboardState().observe(getViewLifecycleOwner(), this::renderDashboard);
         tripViewModel.getActionState().observe(getViewLifecycleOwner(), state -> {
@@ -211,15 +223,17 @@ public class TripFragment extends Fragment {
                         ? data.getNotification()
                         : getString(R.string.notification_placeholder)
         );
+        binding.markDropoffDoneButton.setVisibility(
+                data.getPassengersAlighting() > 0 ? View.VISIBLE : View.GONE
+        );
 
         boolean active = data.hasActiveTrip();
-        // Keep buttons enabled for readable contrast; guard actions in click listeners.
-        binding.startTripButton.setEnabled(true);
-        binding.startTripButton.setAlpha(active ? 0.55f : 1f);
-        binding.endTripButton.setEnabled(true);
-        binding.endTripButton.setAlpha(active ? 1f : 0.55f);
+        binding.startTripButton.setVisibility(active ? View.GONE : View.VISIBLE);
+        binding.endTripButton.setVisibility(active ? View.VISIBLE : View.GONE);
         binding.addPassengerButton.setEnabled(true);
         binding.addPassengerButton.setAlpha(active ? 1f : 0.55f);
+        binding.scanPassengersButton.setEnabled(active);
+        binding.scanPassengersButton.setAlpha(active ? 1f : 0.55f);
         binding.dropoffManifestButton.setEnabled(true);
         binding.dropoffManifestButton.setAlpha(active ? 1f : 0.55f);
     }
@@ -276,6 +290,7 @@ public class TripFragment extends Fragment {
 
             boolean canConfirm = "PENDING".equals(request.getStatus()) || "CONFIRMED".equals(request.getStatus());
             confirm.setVisibility(canConfirm ? View.VISIBLE : View.GONE);
+            confirm.setText("Thêm vào");
             confirm.setOnClickListener(v -> confirmBoardingRequest(request));
             binding.boardingRequestsContainer.addView(item);
         }
@@ -287,7 +302,7 @@ public class TripFragment extends Fragment {
         }
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(R.string.boarding_request_confirm)
-                .setMessage("Xác nhận hành khách đã lên xe qua Bluetooth/request "
+                .setMessage("Thêm hành khách từ check-in Bluetooth vào bộ đếm chuyến "
                         + request.getBluetoothIdentifier() + "?")
                 .setNegativeButton(R.string.dialog_cancel, null)
                 .setPositiveButton(R.string.dialog_confirm,

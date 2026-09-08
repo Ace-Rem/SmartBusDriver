@@ -17,4 +17,7 @@ public class TripEntity {
     public String endedAt;
     public Double currentLatitude;
     public Double currentLongitude;
+    public boolean pendingStartSync;
+    public boolean pendingEndSync;
+    public String localSyncError;
 }

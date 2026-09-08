@@ -28,6 +28,7 @@ public class DriverProfileViewModel extends AndroidViewModel {
             new MutableLiveData<>(UiState.loading());
     private final MutableLiveData<String> routeLabel = new MutableLiveData<>();
     private final MutableLiveData<Boolean> loggedOut = new MutableLiveData<>();
+    private volatile boolean profileLoaded;
 
     public DriverProfileViewModel(@NonNull Application application) {
         super(application);
@@ -50,20 +51,31 @@ public class DriverProfileViewModel extends AndroidViewModel {
     }
 
     public void loadProfile() {
+        DriverModel cached = authRepository.getCachedDriver();
+        if (cached != null) {
+            profileLoaded = true;
+            profileState.setValue(UiState.success(cached));
+            loadRouteLabel();
+            return;
+        }
+        if (profileLoaded) {
+            return;
+        }
         profileState.setValue(UiState.loading());
         executor.execute(() -> {
             Result<DriverModel> result = authRepository.getMe();
             if (result.isSuccess() && result.getData() != null) {
+                profileLoaded = true;
                 profileState.postValue(UiState.success(result.getData()));
             } else {
-                DriverModel cached = authRepository.getCachedDriver();
-                if (cached != null) {
-                    profileState.postValue(UiState.success(cached));
-                } else {
-                    profileState.postValue(UiState.error(result.getMessage()));
-                }
+                profileState.postValue(UiState.error(result.getMessage()));
             }
+            loadRouteLabel();
+        });
+    }
 
+    private void loadRouteLabel() {
+        executor.execute(() -> {
             Result<TripModel> tripResult = tripRepository.getCurrentTrip();
             if (tripResult.isSuccess()
                     && tripResult.getData() != null
@@ -83,9 +95,9 @@ public class DriverProfileViewModel extends AndroidViewModel {
     }
 
     public void logout() {
+        loggedOut.setValue(true);
         executor.execute(() -> {
             authRepository.logout();
-            loggedOut.postValue(true);
         });
     }
 

@@ -9,6 +9,7 @@ import com.smartbus.driver.model.BootstrapModel;
 import com.smartbus.driver.model.CreatePassengerRecordRequest;
 import com.smartbus.driver.model.CreateTripRequest;
 import com.smartbus.driver.model.DriverModel;
+import com.smartbus.driver.model.FastBoardingSignalModel;
 import com.smartbus.driver.model.LoginRequest;
 import com.smartbus.driver.model.LoginResponse;
 import com.smartbus.driver.model.PassengerRecordModel;
@@ -80,6 +81,12 @@ public interface SmartBusApi {
 
     @GET("boarding-requests")
     Call<ApiResponse<List<BoardingRequestModel>>> getBoardingRequests(@Query("tripId") long tripId);
+
+    @GET("fast-boarding-signals")
+    Call<ApiResponse<List<FastBoardingSignalModel>>> getFastBoardingSignals(
+            @Query("routeId") long routeId,
+            @Query("afterId") long afterId
+    );
 
     @POST("boarding-requests/{id}/confirm-boarding")
     Call<ApiResponse<BoardingRequestModel>> confirmBoarding(@Path("id") long requestId);

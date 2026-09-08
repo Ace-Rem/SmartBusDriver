@@ -4,8 +4,11 @@ import com.smartbus.driver.database.EntityMapper;
 import com.smartbus.driver.database.PassengerRecordDao;
 import com.smartbus.driver.database.PassengerRecordEntity;
 import com.smartbus.driver.model.ApiResponse;
+import com.smartbus.driver.model.BoardingRequestModel;
 import com.smartbus.driver.model.CreatePassengerRecordRequest;
 import com.smartbus.driver.model.PassengerRecordModel;
+import com.smartbus.driver.model.StopModel;
+import com.smartbus.driver.model.TripModel;
 import com.smartbus.driver.network.RetrofitClient;
 import com.smartbus.driver.network.SmartBusApi;
 import com.smartbus.driver.utils.ApiResponseParser;
@@ -13,6 +16,8 @@ import com.smartbus.driver.utils.Result;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import retrofit2.Response;
 
 public class PassengerRecordRepository {
@@ -26,6 +31,168 @@ public class PassengerRecordRepository {
     }
 
     public Result<PassengerRecordModel> create(Long tripId, Long stopId, int passengerCount, String note) {
+        PassengerRecordModel local = createLocal(
+                tripId,
+                null,
+                stopId,
+                null,
+                null,
+                null,
+                passengerCount,
+                "ON_BOARD",
+                note,
+                "MANUAL",
+                tripId + ":manual:" + System.currentTimeMillis()
+        );
+        return Result.success(local);
+    }
+
+    public Result<PassengerRecordModel> createFromBle(
+            long tripId,
+            Long destinationStopId,
+            Double destinationLatitude,
+            Double destinationLongitude,
+            String passengerIdentifier,
+            String note
+    ) {
+        if (passengerIdentifier == null || passengerIdentifier.isBlank()) {
+            return Result.error("BLE payload thiếu mã hành khách/thiết bị.");
+        }
+        String idempotencyKey = tripId + ":ble:" + passengerIdentifier;
+        PassengerRecordEntity existing = passengerRecordDao.findByTripAndIdempotencyKey(tripId, idempotencyKey);
+        if (existing != null) {
+            return Result.success(EntityMapper.toPassengerRecordModel(existing), "Hành khách đã được ghi nhận trước đó.");
+        }
+        PassengerRecordModel local = createLocal(
+                tripId,
+                null,
+                destinationStopId,
+                destinationLatitude,
+                destinationLongitude,
+                passengerIdentifier,
+                1,
+                "PENDING",
+                note,
+                "BLE",
+                idempotencyKey
+        );
+        return Result.success(local);
+    }
+
+    public Result<PassengerRecordModel> createFromFastSignal(
+            long tripId,
+            long signalId,
+            Long destinationStopId,
+            String note
+    ) {
+        String passengerIdentifier = "FAST-" + signalId;
+        String idempotencyKey = tripId + ":fast:" + signalId;
+        PassengerRecordEntity existing = passengerRecordDao.findByTripAndIdempotencyKey(
+                tripId,
+                idempotencyKey
+        );
+        if (existing != null) {
+            return Result.success(
+                    EntityMapper.toPassengerRecordModel(existing),
+                    "Tín hiệu backend đã được ghi nhận trước đó."
+            );
+        }
+        PassengerRecordModel local = createLocal(
+                tripId,
+                null,
+                destinationStopId,
+                null,
+                null,
+                passengerIdentifier,
+                1,
+                "PENDING",
+                note,
+                "BACKEND_FAST",
+                idempotencyKey
+        );
+        return Result.success(local, "Đã nhận yêu cầu lên xe.");
+    }
+
+    private PassengerRecordModel createLocal(
+            Long tripId,
+            Long boardingStopId,
+            Long destinationStopId,
+            Double destinationLatitude,
+            Double destinationLongitude,
+            String passengerIdentifier,
+            int passengerCount,
+            String status,
+            String note,
+            String source,
+            String idempotencyKey
+    ) {
+        PassengerRecordEntity entity = new PassengerRecordEntity();
+        entity.id = -System.currentTimeMillis();
+        entity.tripId = tripId == null ? 0L : tripId;
+        entity.stopId = destinationStopId;
+        entity.boardingStopId = boardingStopId;
+        entity.destinationStopId = destinationStopId;
+        entity.destinationLatitude = destinationLatitude;
+        entity.destinationLongitude = destinationLongitude;
+        entity.passengerIdentifier = passengerIdentifier;
+        entity.status = status;
+        entity.passengerCount = passengerCount;
+        entity.recordedAt = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        entity.note = note;
+        entity.source = source;
+        entity.idempotencyKey = idempotencyKey;
+        entity.pendingSync = false;
+        passengerRecordDao.upsert(entity);
+        return EntityMapper.toPassengerRecordModel(entity);
+    }
+
+    public void syncPending() {
+        // Driver passenger/check-in data is local-only.
+    }
+
+    private void syncPending(PassengerRecordEntity local) {
+        if (local.tripId <= 0) {
+            return;
+        }
+        try {
+            CreatePassengerRecordRequest request =
+                    new CreatePassengerRecordRequest(
+                            local.tripId,
+                            local.boardingStopId,
+                            local.destinationStopId != null ? local.destinationStopId : local.stopId,
+                            local.passengerCount,
+                            local.note,
+                            local.source,
+                            local.idempotencyKey
+                    );
+            Response<ApiResponse<PassengerRecordModel>> response =
+                    api.createPassengerRecord(request).execute();
+            Result<PassengerRecordModel> result = ApiResponseParser.parse(response);
+            if (result.isSuccess() && result.getData() != null) {
+                PassengerRecordEntity entity = EntityMapper.toEntity(result.getData());
+                if (entity != null) {
+                    entity.status = local.status;
+                    entity.passengerIdentifier = local.passengerIdentifier;
+                    entity.source = local.source;
+                    entity.idempotencyKey = local.idempotencyKey;
+                    entity.pendingSync = false;
+                    if (local.id < 0) {
+                        passengerRecordDao.deleteById(local.id);
+                        passengerRecordDao.upsert(entity);
+                    } else {
+                        entity.id = local.id;
+                        passengerRecordDao.upsert(entity);
+                    }
+                } else {
+                    local.pendingSync = false;
+                    passengerRecordDao.upsert(local);
+                }
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
+    public Result<PassengerRecordModel> createRemote(Long tripId, Long stopId, int passengerCount, String note) {
         try {
             CreatePassengerRecordRequest request =
                     new CreatePassengerRecordRequest(tripId, stopId, passengerCount, note);
@@ -45,36 +212,106 @@ public class PassengerRecordRepository {
     }
 
     public Result<List<PassengerRecordModel>> getByTrip(long tripId) {
-        try {
-            Response<ApiResponse<List<PassengerRecordModel>>> response =
-                    api.getPassengerRecords(tripId).execute();
-            Result<List<PassengerRecordModel>> result = ApiResponseParser.parse(response);
-            if (result.isSuccess() && result.getData() != null) {
-                passengerRecordDao.deleteByTripId(tripId);
-                List<PassengerRecordEntity> entities = new ArrayList<>();
-                for (PassengerRecordModel model : result.getData()) {
-                    PassengerRecordEntity entity = EntityMapper.toEntity(model);
-                    if (entity != null) {
-                        entities.add(entity);
-                    }
-                }
-                passengerRecordDao.upsertAll(entities);
+        List<PassengerRecordEntity> cached = passengerRecordDao.findByTripId(tripId);
+        List<PassengerRecordModel> models = new ArrayList<>();
+        if (cached != null) {
+            for (PassengerRecordEntity entity : cached) {
+                models.add(EntityMapper.toPassengerRecordModel(entity));
             }
-            return result;
-        } catch (IOException exception) {
-            List<PassengerRecordEntity> cached = passengerRecordDao.findByTripId(tripId);
-            if (cached != null && !cached.isEmpty()) {
-                List<PassengerRecordModel> models = new ArrayList<>();
-                for (PassengerRecordEntity entity : cached) {
-                    models.add(EntityMapper.toPassengerRecordModel(entity));
-                }
-                return Result.success(models);
-            }
-            return ApiResponseParser.fromThrowable(exception);
         }
+        return Result.success(models);
+    }
+
+    public List<PassengerRecordModel> getCachedByTrip(long tripId) {
+        List<PassengerRecordEntity> cached = passengerRecordDao.findByTripId(tripId);
+        List<PassengerRecordModel> models = new ArrayList<>();
+        if (cached == null) {
+            return models;
+        }
+        for (PassengerRecordEntity entity : cached) {
+            models.add(EntityMapper.toPassengerRecordModel(entity));
+        }
+        return models;
     }
 
     public int getCachedPassengerTotal(long tripId) {
-        return passengerRecordDao.sumPassengerCount(tripId);
+        return passengerRecordDao.sumPassengerCountByStatus(tripId, "ON_BOARD");
+    }
+
+    public int getCachedAlightingTotal(long tripId, long destinationStopId) {
+        return passengerRecordDao.sumPassengerCountByDestinationAndStatus(tripId, destinationStopId, "ON_BOARD");
+    }
+
+    public int getCachedAlightingTotal(long tripId, double latitude, double longitude) {
+        return passengerRecordDao.sumPassengerCountByDestinationCoordinatesAndStatus(
+                tripId,
+                latitude,
+                longitude,
+                "ON_BOARD"
+        );
+    }
+
+    public List<BoardingRequestModel> getLocalBoardingRequests(long tripId) {
+        return toBoardingRequests(passengerRecordDao.findByTripIdAndStatus(tripId, "PENDING"));
+    }
+
+    public Result<PassengerRecordModel> confirmLocalBoarding(long recordId) {
+        passengerRecordDao.updateStatus(recordId, "ON_BOARD");
+        return Result.success(
+                EntityMapper.toPassengerRecordModel(passengerRecordDao.findById(recordId)),
+                "Đã thêm hành khách vào chuyến"
+        );
+    }
+
+    public void markDroppedOffByCoordinates(long tripId, double latitude, double longitude) {
+        List<PassengerRecordEntity> records = passengerRecordDao.findByDestinationCoordinatesAndStatus(
+                tripId,
+                latitude,
+                longitude,
+                "ON_BOARD"
+        );
+        if (records == null) {
+            return;
+        }
+        for (PassengerRecordEntity record : records) {
+            passengerRecordDao.updateStatus(record.id, "DROPPED_OFF");
+        }
+    }
+
+    private List<BoardingRequestModel> toBoardingRequests(List<PassengerRecordEntity> records) {
+        List<BoardingRequestModel> requests = new ArrayList<>();
+        if (records == null) {
+            return requests;
+        }
+        for (PassengerRecordEntity record : records) {
+            BoardingRequestModel request = new BoardingRequestModel();
+            request.setId(record.id);
+            request.setPassengerRecordId(record.id);
+            request.setStatus(record.status);
+            request.setBluetoothIdentifier(record.passengerIdentifier);
+            request.setRequestedAt(record.recordedAt);
+            request.setNote(record.note);
+            TripModel trip = new TripModel();
+            trip.setId(record.tripId);
+            request.setTrip(trip);
+            StopModel destination = new StopModel();
+            destination.setId(record.destinationStopId);
+            destination.setLatitude(record.destinationLatitude);
+            destination.setLongitude(record.destinationLongitude);
+            destination.setName(destinationName(record));
+            request.setDestinationStop(destination);
+            requests.add(request);
+        }
+        return requests;
+    }
+
+    private String destinationName(PassengerRecordEntity record) {
+        if (record.destinationLatitude == null || record.destinationLongitude == null) {
+            if (record.destinationStopId != null) {
+                return "Bến xuống #" + record.destinationStopId;
+            }
+            return "Bến xuống đã chọn";
+        }
+        return String.format("%.5f, %.5f", record.destinationLatitude, record.destinationLongitude);
     }
 }

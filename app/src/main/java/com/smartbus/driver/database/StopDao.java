@@ -15,6 +15,9 @@ public interface StopDao {
     @Query("SELECT * FROM stops WHERE routeId = :routeId ORDER BY stopOrder ASC")
     List<StopEntity> findByRouteId(long routeId);
 
+    @Query("SELECT * FROM stops ORDER BY routeId ASC, stopOrder ASC")
+    List<StopEntity> getAll();
+
     @Query("DELETE FROM stops WHERE routeId = :routeId")
     void deleteByRouteId(long routeId);
 

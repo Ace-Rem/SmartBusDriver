@@ -17,9 +17,13 @@ import com.smartbus.driver.utils.Result;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import retrofit2.Response;
 
 public class TripRepository {
+
+    private static final long MIN_LOCAL_TRIP_ID = 1_000_000_000_000L;
 
     private final SmartBusApi api;
     private final TripDao tripDao;
@@ -30,51 +34,125 @@ public class TripRepository {
     }
 
     public Result<TripModel> startTrip(long routeId) {
+        TripModel localTrip = startTripLocally(routeId);
+        return Result.success(localTrip);
+    }
+
+    public TripModel startTripLocally(long routeId) {
+        TripEntity existing = tripDao.findLocalByStatus(Constants.TRIP_STATUS_IN_PROGRESS, MIN_LOCAL_TRIP_ID);
+        if (existing != null) {
+            return EntityMapper.toTripModel(existing);
+        }
+        TripEntity entity = new TripEntity();
+        entity.id = System.currentTimeMillis();
+        entity.routeId = routeId;
+        entity.status = Constants.TRIP_STATUS_IN_PROGRESS;
+        entity.startedAt = now();
+        entity.pendingStartSync = false;
+        tripDao.upsert(entity);
+        return EntityMapper.toTripModel(entity);
+    }
+
+    public void syncPendingTrips() {
+        List<TripEntity> pending = tripDao.findPendingSync();
+        if (pending == null || pending.isEmpty()) {
+            return;
+        }
+        for (TripEntity entity : pending) {
+            if (!Constants.TRIP_STATUS_COMPLETED.equals(entity.status) || !entity.pendingEndSync) {
+                continue;
+            }
+            TripEntity latest = entity.pendingStartSync ? syncStart(entity) : entity;
+            if (latest != null && latest.pendingEndSync) {
+                syncEnd(latest);
+            }
+        }
+    }
+
+    private TripEntity syncStart(TripEntity local) {
         try {
             Response<ApiResponse<TripModel>> response =
-                    api.startTrip(new CreateTripRequest(routeId)).execute();
+                    api.startTrip(new CreateTripRequest(local.routeId)).execute();
             Result<TripModel> result = ApiResponseParser.parse(response);
-            cacheTrip(result.getData());
-            return result;
+            if (result.isSuccess() && result.getData() != null) {
+                TripEntity synced = EntityMapper.toEntity(result.getData());
+                if (synced != null) {
+                    synced.pendingStartSync = false;
+                    synced.pendingEndSync = local.pendingEndSync;
+                    if (local.pendingEndSync) {
+                        synced.status = local.status;
+                        synced.endedAt = local.endedAt;
+                    }
+                    synced.localSyncError = null;
+                    if (local.id < 0) {
+                        tripDao.deleteById(local.id);
+                        tripDao.upsert(synced);
+                    } else {
+                        synced.id = local.id;
+                        tripDao.upsert(synced);
+                    }
+                    return synced;
+                }
+            } else {
+                local.localSyncError = result.getMessage();
+                tripDao.upsert(local);
+            }
         } catch (IOException exception) {
-            return ApiResponseParser.fromThrowable(exception);
+            local.localSyncError = exception.getMessage();
+            tripDao.upsert(local);
+        }
+        return local;
+    }
+
+    private void syncEnd(TripEntity local) {
+        if (local.id < 0) {
+            local.pendingEndSync = false;
+            local.pendingStartSync = false;
+            local.localSyncError = "Trip ended locally before backend start sync completed";
+            tripDao.upsert(local);
+            return;
+        }
+        try {
+            Response<ApiResponse<TripModel>> response = api.endCurrentTrip().execute();
+            Result<TripModel> result = ApiResponseParser.parse(response);
+            if (result.isSuccess() && result.getData() != null) {
+                local.pendingStartSync = false;
+                local.pendingEndSync = false;
+                local.localSyncError = null;
+                tripDao.upsert(local);
+            } else {
+                local.localSyncError = result.getMessage();
+                tripDao.upsert(local);
+            }
+        } catch (IOException exception) {
+            local.localSyncError = exception.getMessage();
+            tripDao.upsert(local);
         }
     }
 
     public Result<TripModel> getCurrentTrip() {
-        try {
-            Response<ApiResponse<TripModel>> response = api.getCurrentTrip().execute();
-            if (response.code() == 404) {
-                return Result.success(null);
-            }
-            Result<TripModel> result = ApiResponseParser.parse(response);
-            if (result.isSuccess()) {
-                cacheTrip(result.getData());
-            } else if (result.getMessage() != null
-                    && result.getMessage().toLowerCase().contains("no in-progress trip")) {
-                return Result.success(null);
-            }
-            return result;
-        } catch (IOException exception) {
-            TripModel cached = EntityMapper.toTripModel(
-                    tripDao.findByStatus(Constants.TRIP_STATUS_IN_PROGRESS)
-            );
-            if (cached != null) {
-                return Result.success(cached);
-            }
-            return ApiResponseParser.fromThrowable(exception);
-        }
+        TripModel cached = EntityMapper.toTripModel(
+                tripDao.findLocalByStatus(Constants.TRIP_STATUS_IN_PROGRESS, MIN_LOCAL_TRIP_ID)
+        );
+        return Result.success(cached);
     }
 
     public Result<TripModel> endCurrentTrip() {
-        try {
-            Response<ApiResponse<TripModel>> response = api.endCurrentTrip().execute();
-            Result<TripModel> result = ApiResponseParser.parse(response);
-            cacheTrip(result.getData());
-            return result;
-        } catch (IOException exception) {
-            return ApiResponseParser.fromThrowable(exception);
+        TripEntity active = tripDao.findLocalByStatus(Constants.TRIP_STATUS_IN_PROGRESS, MIN_LOCAL_TRIP_ID);
+        if (active == null) {
+            return Result.success(null);
         }
+        active.status = Constants.TRIP_STATUS_COMPLETED;
+        active.endedAt = now();
+        active.pendingStartSync = true;
+        active.pendingEndSync = true;
+        tripDao.upsert(active);
+        TripModel ended = EntityMapper.toTripModel(active);
+        return Result.success(ended);
+    }
+
+    public void updateLocalLocation(long tripId, double latitude, double longitude) {
+        tripDao.updateLocation(tripId, latitude, longitude);
     }
 
     public Result<UpdateLocationResponse> updateLocation(double latitude, double longitude) {
@@ -169,5 +247,9 @@ public class TripRepository {
         if (entity != null) {
             tripDao.upsert(entity);
         }
+    }
+
+    private String now() {
+        return LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
     }
 }

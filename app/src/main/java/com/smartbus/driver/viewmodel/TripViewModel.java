@@ -1,15 +1,20 @@
 package com.smartbus.driver.viewmodel;
 
 import android.app.Application;
+import android.os.Handler;
+import android.os.Looper;
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import com.smartbus.driver.SmartBusApp;
+import com.smartbus.driver.bluetooth.DriverBlePayload;
+import com.smartbus.driver.bluetooth.DriverBluetoothManager;
 import com.smartbus.driver.gps.GpsManager;
 import com.smartbus.driver.model.DashboardState;
 import com.smartbus.driver.model.BoardingRequestModel;
 import com.smartbus.driver.model.DriverModel;
+import com.smartbus.driver.model.FastBoardingSignalModel;
 import com.smartbus.driver.model.LocalLocation;
 import com.smartbus.driver.model.PassengerRecordModel;
 import com.smartbus.driver.model.RouteModel;
@@ -19,6 +24,7 @@ import com.smartbus.driver.model.UpdateLocationResponse;
 import com.smartbus.driver.repository.AuthRepository;
 import com.smartbus.driver.repository.BoardingRequestRepository;
 import com.smartbus.driver.repository.BootstrapRepository;
+import com.smartbus.driver.repository.FastBoardingSignalRepository;
 import com.smartbus.driver.repository.PassengerRecordRepository;
 import com.smartbus.driver.repository.RouteRepository;
 import com.smartbus.driver.repository.TripRepository;
@@ -40,11 +46,22 @@ public class TripViewModel extends AndroidViewModel {
     private final RouteRepository routeRepository;
     private final PassengerRecordRepository passengerRecordRepository;
     private final BoardingRequestRepository boardingRequestRepository;
+    private final FastBoardingSignalRepository fastBoardingSignalRepository;
     private final GpsManager gpsManager;
+    private final DriverBluetoothManager bluetoothManager;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService fastSignalExecutor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean locationUpdateInFlight = new AtomicBoolean(false);
+    private final AtomicBoolean fastSignalPollInFlight = new AtomicBoolean(false);
     private volatile Double pendingLatitude;
     private volatile Double pendingLongitude;
+    private volatile Double pendingDropoffLatitude;
+    private volatile Double pendingDropoffLongitude;
+    private volatile long lastFastSignalId;
+    private Long fastSignalRouteId;
+    private boolean fastSignalPolling;
+    private final Runnable fastSignalPollRunnable = this::pollFastBoardingSignals;
 
     private final MutableLiveData<UiState<DashboardState>> dashboardState =
             new MutableLiveData<>(UiState.loading());
@@ -55,6 +72,7 @@ public class TripViewModel extends AndroidViewModel {
     private final MutableLiveData<String> gpsMessage = new MutableLiveData<>();
     private final MutableLiveData<UiState<List<BoardingRequestModel>>> boardingRequestsState =
             new MutableLiveData<>(UiState.idle());
+    private final MutableLiveData<String> dropoffPrompt = new MutableLiveData<>();
 
     private final Object dashboardLock = new Object();
     private DashboardState currentDashboard = new DashboardState();
@@ -69,7 +87,9 @@ public class TripViewModel extends AndroidViewModel {
         routeRepository = new RouteRepository(app.getDatabase().routeDao(), app.getDatabase().stopDao());
         passengerRecordRepository = new PassengerRecordRepository(app.getDatabase().passengerRecordDao());
         boardingRequestRepository = new BoardingRequestRepository();
+        fastBoardingSignalRepository = new FastBoardingSignalRepository();
         gpsManager = new GpsManager(application);
+        bluetoothManager = new DriverBluetoothManager(application);
     }
 
     public LiveData<UiState<DashboardState>> getDashboardState() {
@@ -100,6 +120,10 @@ public class TripViewModel extends AndroidViewModel {
         return boardingRequestsState;
     }
 
+    public LiveData<String> getDropoffPrompt() {
+        return dropoffPrompt;
+    }
+
     public GpsManager getGpsManager() {
         return gpsManager;
     }
@@ -119,13 +143,8 @@ public class TripViewModel extends AndroidViewModel {
             dashboardState.setValue(UiState.loading());
         }
         executor.execute(() -> {
-            bootstrapRepository.sync();
             DashboardState state = new DashboardState();
             DriverModel driver = authRepository.getCachedDriver();
-            Result<DriverModel> meResult = authRepository.getMe();
-            if (meResult.isSuccess() && meResult.getData() != null) {
-                driver = meResult.getData();
-            }
             state.setDriver(driver);
 
             Result<TripModel> tripResult = tripRepository.getCurrentTrip();
@@ -148,22 +167,17 @@ public class TripViewModel extends AndroidViewModel {
                     stopsState.postValue(stops);
                 }
 
-                Result<StopModel> currentStopResult = tripRepository.getCurrentStop();
-                if (currentStopResult.isSuccess() && currentStopResult.getData() != null) {
-                    state.setCurrentStop(currentStopResult.getData());
-                }
-
-                Result<StopModel> nextStopResult = tripRepository.getNextStop();
-                if (nextStopResult.isSuccess() && nextStopResult.getData() != null) {
-                    state.setNextStop(nextStopResult.getData());
-                }
-
                 // Prefer nearest/next from device GPS so UI works even if backend
                 // has not persisted currentStop yet (or old deploy still gates at 50m).
                 Location lastLocation = gpsManager.getLastKnownLocation();
                 if (lastLocation != null && stops != null && !stops.isEmpty()) {
                     applyNearestToState(state, stops, lastLocation.getLatitude(), lastLocation.getLongitude());
                 } else {
+                    StopModel persistedCurrent = StopGeoHelper.findById(stops, trip.getCurrentStopId());
+                    if (persistedCurrent != null) {
+                        state.setCurrentStop(persistedCurrent);
+                        state.setNextStop(StopGeoHelper.findNext(stops, persistedCurrent));
+                    }
                     DashboardState previous;
                     synchronized (dashboardLock) {
                         previous = currentDashboard;
@@ -188,7 +202,7 @@ public class TripViewModel extends AndroidViewModel {
                             ? state.getCurrentStop().getId()
                             : null;
                     for (PassengerRecordModel record : passengers.getData()) {
-                        if (record.getPassengerCount() != null) {
+                        if ("ON_BOARD".equals(record.getStatus()) && record.getPassengerCount() != null) {
                             total += record.getPassengerCount();
                             if (currentStopId != null && currentStopId.equals(record.getStopId())) {
                                 alighting += record.getPassengerCount();
@@ -211,6 +225,8 @@ public class TripViewModel extends AndroidViewModel {
                 } else {
                     state.setNotification("Chuyến đang chạy");
                 }
+                mainHandler.post(this::startBleScanning);
+                mainHandler.post(this::startFastSignalPolling);
             } else {
                 state.setGpsStatus(gpsManager.hasLocationPermission() ? "Đã sẵn sàng" : "Cần quyền vị trí");
                 state.setNotification("Chưa có chuyến đang chạy");
@@ -222,6 +238,9 @@ public class TripViewModel extends AndroidViewModel {
                 currentDashboard = state;
             }
             dashboardState.postValue(UiState.success(state));
+            tripRepository.syncPendingTrips();
+            passengerRecordRepository.syncPending();
+            bootstrapRepository.sync();
         });
     }
 
@@ -234,13 +253,15 @@ public class TripViewModel extends AndroidViewModel {
             actionState.setValue(UiState.error("Đã có chuyến đang chạy. Hãy kết thúc trước khi bắt đầu chuyến mới."));
             return;
         }
-        actionState.setValue(UiState.loading());
         executor.execute(() -> {
             Result<TripModel> result = tripRepository.startTrip(routeId);
             if (result.isSuccess()) {
+                publishStartedTrip(result.getData());
                 actionState.postValue(UiState.success(result.getData(), "Đã bắt đầu chuyến"));
-                loadDashboard(false);
-                startGpsTracking();
+                mainHandler.post(() -> {
+                    startGpsTracking();
+                    startBleScanning();
+                });
             } else {
                 actionState.postValue(UiState.error(result.getMessage()));
             }
@@ -248,13 +269,14 @@ public class TripViewModel extends AndroidViewModel {
     }
 
     public void endTrip() {
-        actionState.setValue(UiState.loading());
-        clearActiveTripLocally("Đang kết thúc chuyến...");
+        clearActiveTripLocally("Đã kết thúc chuyến");
         executor.execute(() -> {
             Result<TripModel> result = tripRepository.endCurrentTrip();
             if (result.isSuccess()) {
                 actionState.postValue(UiState.success(result.getData(), "Đã kết thúc chuyến"));
                 loadDashboard(false);
+                stopBleScanning();
+                executor.execute(tripRepository::syncPendingTrips);
             } else {
                 actionState.postValue(UiState.error(result.getMessage()));
                 loadDashboard(false);
@@ -264,6 +286,8 @@ public class TripViewModel extends AndroidViewModel {
 
     private void clearActiveTripLocally(String notification) {
         stopGpsTracking();
+        stopBleScanning();
+        stopFastSignalPolling();
         DashboardState next = new DashboardState();
         DashboardState previous;
         synchronized (dashboardLock) {
@@ -281,39 +305,93 @@ public class TripViewModel extends AndroidViewModel {
     }
 
     public void startGpsTracking() {
-        if (!gpsManager.hasLocationPermission()) {
-            gpsMessage.postValue("Cần cấp quyền vị trí để gửi GPS");
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::startGpsTracking);
             return;
         }
-        if (gpsManager.isTracking()) {
-            return;
-        }
-        gpsManager.startUpdates(new GpsManager.LocationListener() {
-            @Override
-            public void onLocationUpdated(double latitude, double longitude) {
-                DashboardState snapshot = getCurrentDashboard();
-                if (snapshot == null || !snapshot.hasActiveTrip()) {
-                    return;
+        try {
+            if (!gpsManager.hasLocationPermission()) {
+                gpsMessage.postValue("Cần cấp quyền vị trí để gửi GPS");
+                return;
+            }
+            if (gpsManager.isTracking()) {
+                return;
+            }
+            gpsManager.startUpdates(new GpsManager.LocationListener() {
+                @Override
+                public void onLocationUpdated(double latitude, double longitude) {
+                    DashboardState snapshot = getCurrentDashboard();
+                    if (snapshot == null || !snapshot.hasActiveTrip()) {
+                        return;
+                    }
+                    // Room queries must not run on the main thread; GPS callbacks
+                    // are delivered on the main looper, so defer DB work to executor.
+                    localLocation.postValue(new LocalLocation(latitude, longitude));
+                    enqueueLocationUpdate(latitude, longitude);
                 }
-                localLocation.postValue(new LocalLocation(latitude, longitude));
-                applyLocalNearestStops(latitude, longitude);
-                enqueueLocationUpdate(latitude, longitude);
-            }
 
-            @Override
-            public void onLocationError(String message) {
-                gpsMessage.postValue(message);
+                @Override
+                public void onLocationError(String message) {
+                    gpsMessage.postValue(message);
+                }
+            });
+            synchronized (dashboardLock) {
+                currentDashboard.setTracking(true);
+                currentDashboard.setGpsStatus("Đang gửi mỗi 5 giây");
+                dashboardState.postValue(UiState.success(currentDashboard));
             }
-        });
-        synchronized (dashboardLock) {
-            currentDashboard.setTracking(true);
-            currentDashboard.setGpsStatus("Đang gửi mỗi 5 giây");
-            dashboardState.postValue(UiState.success(currentDashboard));
+        } catch (RuntimeException exception) {
+            gpsMessage.postValue("Không khởi động được định vị: " + exception.getMessage());
         }
     }
 
+    public void clearActionState() {
+        actionState.setValue(UiState.idle());
+    }
+
+    private void publishStartedTrip(TripModel trip) {
+        if (trip == null) {
+            return;
+        }
+        DashboardState state = new DashboardState();
+        state.setDriver(authRepository.getCachedDriver());
+        state.setTrip(trip);
+        state.setTracking(gpsManager.isTracking());
+        state.setGpsStatus(gpsManager.hasLocationPermission() ? "Đã sẵn sàng" : "Cần quyền vị trí");
+        state.setNotification("Chuyến đang chạy");
+        Result<RouteModel> routeResult = routeRepository.getRoute(trip.getRouteId());
+        if (routeResult.isSuccess()) {
+            state.setRoute(routeResult.getData());
+            if (routeResult.getData() != null) {
+                state.setNotification("Đang chạy chuyến "
+                        + routeResult.getData().getCode() + " - " + routeResult.getData().getName());
+            }
+        }
+        Result<List<StopModel>> stopsResult = routeRepository.getStops(trip.getRouteId());
+        if (stopsResult.isSuccess()) {
+            List<StopModel> stops = StopGeoHelper.sortedByOrder(stopsResult.getData());
+            cachedStops = stops;
+            stopsState.postValue(stops);
+        }
+        synchronized (dashboardLock) {
+            currentDashboard = state;
+        }
+        boardingRequestsState.postValue(UiState.success(null));
+        dashboardState.postValue(UiState.success(state));
+        mainHandler.post(this::startBleScanning);
+        mainHandler.post(this::startFastSignalPolling);
+    }
+
     public void stopGpsTracking() {
-        gpsManager.stopUpdates();
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::stopGpsTracking);
+            return;
+        }
+        try {
+            gpsManager.stopUpdates();
+        } catch (RuntimeException exception) {
+            gpsMessage.postValue("Không dừng được định vị: " + exception.getMessage());
+        }
         synchronized (dashboardLock) {
             currentDashboard.setTracking(false);
         }
@@ -336,7 +414,7 @@ public class TripViewModel extends AndroidViewModel {
             int alighting = 0;
             if (passengers.isSuccess() && passengers.getData() != null) {
                 for (PassengerRecordModel record : passengers.getData()) {
-                    if (record.getPassengerCount() != null) {
+                    if ("ON_BOARD".equals(record.getStatus()) && record.getPassengerCount() != null) {
                         total += record.getPassengerCount();
                         if (currentStopId != null && currentStopId.equals(record.getStopId())) {
                             alighting += record.getPassengerCount();
@@ -345,6 +423,9 @@ public class TripViewModel extends AndroidViewModel {
                 }
             } else {
                 total = passengerRecordRepository.getCachedPassengerTotal(tripId);
+            }
+            if (currentStopId != null) {
+                alighting = passengerRecordRepository.getCachedAlightingTotal(tripId, currentStopId);
             }
             synchronized (dashboardLock) {
                 currentDashboard.setPassengerTotal(total);
@@ -363,10 +444,28 @@ public class TripViewModel extends AndroidViewModel {
         loadBoardingRequests(snapshot.getTrip().getId(), true);
     }
 
+    public void scanPassengerCheckIns() {
+        ensureBleScanning();
+        DashboardState snapshot = getCurrentDashboard();
+        if (snapshot == null || !snapshot.hasActiveTrip()) {
+            gpsMessage.setValue("Hãy bắt đầu chuyến trước khi quét hành khách.");
+            return;
+        }
+        gpsMessage.setValue("Đang quét check-in BLE của hành khách cho tuyến #"
+                + snapshot.getTrip().getRouteId());
+    }
+
+    public void ensureBleScanning() {
+        if (!getCurrentDashboard().hasActiveTrip()) {
+            return;
+        }
+        startBleScanning();
+    }
+
     public void confirmBoardingRequest(long requestId) {
         actionState.setValue(UiState.loading());
         executor.execute(() -> {
-            Result<BoardingRequestModel> result = boardingRequestRepository.confirmBoarding(requestId);
+            Result<PassengerRecordModel> result = passengerRecordRepository.confirmLocalBoarding(requestId);
             if (result.isSuccess()) {
                 actionState.postValue(UiState.success(null, "Đã xác nhận hành khách lên xe"));
                 refreshPassengerTotal();
@@ -377,17 +476,32 @@ public class TripViewModel extends AndroidViewModel {
         });
     }
 
+    public void markCurrentDropoffDone() {
+        DashboardState snapshot = getCurrentDashboard();
+        Double latitude = pendingDropoffLatitude;
+        Double longitude = pendingDropoffLongitude;
+        if (snapshot == null || snapshot.getTrip() == null || snapshot.getTrip().getId() == null
+                || latitude == null || longitude == null) {
+            actionState.setValue(UiState.error("Chưa có nhóm khách xuống trong phạm vi 200m."));
+            return;
+        }
+        executor.execute(() -> {
+            passengerRecordRepository.markDroppedOffByCoordinates(snapshot.getTrip().getId(), latitude, longitude);
+            pendingDropoffLatitude = null;
+            pendingDropoffLongitude = null;
+            actionState.postValue(UiState.success(null, "Đã trừ khách xuống khỏi bộ đếm"));
+            refreshPassengerTotal();
+        });
+    }
+
     private void loadBoardingRequests(long tripId, boolean showLoading) {
         if (showLoading) {
             boardingRequestsState.postValue(UiState.loading());
         }
         executor.execute(() -> {
-            Result<List<BoardingRequestModel>> result = boardingRequestRepository.listByTrip(tripId);
-            if (result.isSuccess()) {
-                boardingRequestsState.postValue(UiState.success(result.getData()));
-            } else {
-                boardingRequestsState.postValue(UiState.error(result.getMessage()));
-            }
+            boardingRequestsState.postValue(UiState.success(
+                    passengerRecordRepository.getLocalBoardingRequests(tripId)
+            ));
         });
     }
 
@@ -412,19 +526,11 @@ public class TripViewModel extends AndroidViewModel {
                 if (latitude == null || longitude == null) {
                     break;
                 }
-                Result<UpdateLocationResponse> result =
-                        tripRepository.updateLocation(latitude, longitude);
-                if (result.isSuccess() && result.getData() != null) {
-                    UpdateLocationResponse data = result.getData();
-                    locationUpdate.postValue(data);
-                    applyLocationToDashboard(data, latitude, longitude);
-                } else {
-                    // Backend failed/old: keep showing nearest from local GPS + stops.
-                    applyLocalNearestStops(latitude, longitude);
-                    if (!result.isSuccess()) {
-                        gpsMessage.postValue(result.getMessage());
-                    }
+                DashboardState snapshot = getCurrentDashboard();
+                if (snapshot != null && snapshot.getTrip() != null && snapshot.getTrip().getId() != null) {
+                    tripRepository.updateLocalLocation(snapshot.getTrip().getId(), latitude, longitude);
                 }
+                applyLocalNearestStops(latitude, longitude);
             } while (pendingLatitude != null && pendingLongitude != null);
         } finally {
             locationUpdateInFlight.set(false);
@@ -470,9 +576,26 @@ public class TripViewModel extends AndroidViewModel {
     }
 
     private void applyLocalNearestStops(double latitude, double longitude) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            executor.execute(() -> applyLocalNearestStops(latitude, longitude));
+            return;
+        }
         synchronized (dashboardLock) {
             fillNearestLocked(latitude, longitude);
             currentDashboard.setGpsStatus(String.format("%.5f, %.5f", latitude, longitude));
+            if (currentDashboard.getTrip() != null
+                    && currentDashboard.getTrip().getId() != null
+                    && currentDashboard.getCurrentStop() != null
+                    && currentDashboard.getCurrentStop().getId() != null) {
+                int alighting = passengerRecordRepository.getCachedAlightingTotal(
+                        currentDashboard.getTrip().getId(),
+                        currentDashboard.getCurrentStop().getId()
+                );
+                currentDashboard.setPassengerTotal(
+                        passengerRecordRepository.getCachedPassengerTotal(currentDashboard.getTrip().getId())
+                );
+                currentDashboard.setPassengersAlighting(alighting);
+            }
             if (currentDashboard.getCurrentStop() != null) {
                 String nextName = currentDashboard.getNextStop() != null
                         ? currentDashboard.getNextStop().getName()
@@ -487,8 +610,61 @@ public class TripViewModel extends AndroidViewModel {
                     );
                 }
             }
+            applyDropoffPromptLocked(latitude, longitude);
             dashboardState.postValue(UiState.success(currentDashboard));
         }
+    }
+
+    private void applyDropoffPromptLocked(double latitude, double longitude) {
+        if (currentDashboard.getTrip() == null || currentDashboard.getTrip().getId() == null) {
+            return;
+        }
+        List<PassengerRecordModel> records = passengerRecordRepository.getCachedByTrip(currentDashboard.getTrip().getId());
+        if (records == null || records.isEmpty()) {
+            return;
+        }
+        int nearestCount = 0;
+        Double nearestLatitude = null;
+        Double nearestLongitude = null;
+        float nearestMeters = Float.MAX_VALUE;
+        for (PassengerRecordModel record : records) {
+            if (!"ON_BOARD".equals(record.getStatus())
+                    || record.getDestinationLatitude() == null
+                    || record.getDestinationLongitude() == null
+                    || record.getPassengerCount() == null) {
+                continue;
+            }
+            float[] result = new float[1];
+            Location.distanceBetween(
+                    latitude,
+                    longitude,
+                    record.getDestinationLatitude(),
+                    record.getDestinationLongitude(),
+                    result
+            );
+            if (result[0] <= 200f && result[0] < nearestMeters) {
+                nearestMeters = result[0];
+                nearestLatitude = record.getDestinationLatitude();
+                nearestLongitude = record.getDestinationLongitude();
+            }
+        }
+        if (nearestLatitude == null || nearestLongitude == null) {
+            pendingDropoffLatitude = null;
+            pendingDropoffLongitude = null;
+            return;
+        }
+        pendingDropoffLatitude = nearestLatitude;
+        pendingDropoffLongitude = nearestLongitude;
+        nearestCount = passengerRecordRepository.getCachedAlightingTotal(
+                currentDashboard.getTrip().getId(),
+                nearestLatitude,
+                nearestLongitude
+        );
+        currentDashboard.setPassengersAlighting(nearestCount);
+        String message = "Còn " + Math.round(nearestMeters)
+                + " m tới bến xuống, có " + nearestCount + " khách xuống.";
+        currentDashboard.setNotification(message);
+        dropoffPrompt.postValue(message);
     }
 
     private void fillNearestLocked(double latitude, double longitude) {
@@ -496,7 +672,12 @@ public class TripViewModel extends AndroidViewModel {
         if (stops == null || stops.isEmpty()) {
             return;
         }
-        StopModel nearest = StopGeoHelper.findNearest(stops, latitude, longitude);
+        StopModel nearest = StopGeoHelper.findCurrentAlongRoute(
+                stops,
+                currentDashboard.getCurrentStop(),
+                latitude,
+                longitude
+        );
         if (nearest == null) {
             return;
         }
@@ -510,7 +691,7 @@ public class TripViewModel extends AndroidViewModel {
             double latitude,
             double longitude
     ) {
-        StopModel nearest = StopGeoHelper.findNearest(stops, latitude, longitude);
+        StopModel nearest = StopGeoHelper.findCurrentAlongRoute(stops, state.getCurrentStop(), latitude, longitude);
         if (nearest == null) {
             return;
         }
@@ -520,10 +701,181 @@ public class TripViewModel extends AndroidViewModel {
         state.setNotification("Gần nhất: " + nearest.getName() + " — tiếp theo: " + nextName);
     }
 
+    private void startBleScanning() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::startBleScanning);
+            return;
+        }
+        try {
+            bluetoothManager.startScanning(new DriverBluetoothManager.Listener() {
+                @Override
+                public void onPayload(DriverBlePayload payload) {
+                    handleBlePayload(payload);
+                }
+
+                @Override
+                public void onMessage(String message) {
+                    gpsMessage.postValue(message);
+                }
+            });
+        } catch (RuntimeException exception) {
+            gpsMessage.postValue("Không khởi động được BLE scan: " + exception.getMessage());
+        }
+    }
+
+    private void startFastSignalPolling() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::startFastSignalPolling);
+            return;
+        }
+        DashboardState snapshot = getCurrentDashboard();
+        if (snapshot == null || !snapshot.hasActiveTrip()
+                || snapshot.getTrip().getRouteId() == null) {
+            return;
+        }
+        Long routeId = snapshot.getTrip().getRouteId();
+        if (fastSignalRouteId == null || !fastSignalRouteId.equals(routeId)) {
+            fastSignalRouteId = routeId;
+            lastFastSignalId = 0L;
+        }
+        if (fastSignalPolling) {
+            return;
+        }
+        fastSignalPolling = true;
+        mainHandler.post(fastSignalPollRunnable);
+    }
+
+    private void stopFastSignalPolling() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::stopFastSignalPolling);
+            return;
+        }
+        fastSignalPolling = false;
+        mainHandler.removeCallbacks(fastSignalPollRunnable);
+        fastSignalRouteId = null;
+        lastFastSignalId = 0L;
+    }
+
+    private void pollFastBoardingSignals() {
+        if (!fastSignalPolling) {
+            return;
+        }
+        DashboardState snapshot = getCurrentDashboard();
+        if (snapshot == null || !snapshot.hasActiveTrip()
+                || snapshot.getTrip().getId() == null
+                || snapshot.getTrip().getRouteId() == null) {
+            stopFastSignalPolling();
+            return;
+        }
+        long targetTripId = snapshot.getTrip().getId();
+        long routeId = snapshot.getTrip().getRouteId();
+        long cursor = lastFastSignalId;
+        if (!fastSignalPollInFlight.compareAndSet(false, true)) {
+            mainHandler.postDelayed(fastSignalPollRunnable, 1_000L);
+            return;
+        }
+        fastSignalExecutor.execute(() -> {
+            boolean changed = false;
+            try {
+                Result<List<FastBoardingSignalModel>> result =
+                        fastBoardingSignalRepository.poll(routeId, cursor);
+                if (!result.isSuccess() || result.getData() == null) {
+                    return;
+                }
+                for (FastBoardingSignalModel signal : result.getData()) {
+                    if (signal == null || signal.getId() == null
+                            || signal.getRouteId() == null
+                            || !Long.valueOf(routeId).equals(signal.getRouteId())
+                            || signal.getDestinationStopId() == null
+                            || signal.getId() <= lastFastSignalId) {
+                        continue;
+                    }
+                    DashboardState current = getCurrentDashboard();
+                    if (current == null || current.getTrip() == null
+                            || !current.hasActiveTrip()
+                            || !Long.valueOf(targetTripId).equals(current.getTrip().getId())
+                            || !Long.valueOf(routeId).equals(current.getTrip().getRouteId())) {
+                        return;
+                    }
+                    Result<PassengerRecordModel> local = passengerRecordRepository.createFromFastSignal(
+                            targetTripId,
+                            signal.getId(),
+                            signal.getDestinationStopId(),
+                            "Backend fast signal route=" + signal.getRouteId()
+                                    + " destinationStop=" + signal.getDestinationStopId()
+                    );
+                    if (local.isSuccess()) {
+                        lastFastSignalId = Math.max(lastFastSignalId, signal.getId());
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    loadBoardingRequests(targetTripId, false);
+                }
+            } finally {
+                fastSignalPollInFlight.set(false);
+                if (fastSignalPolling) {
+                    mainHandler.postDelayed(fastSignalPollRunnable, 1_000L);
+                }
+            }
+        });
+    }
+
+    private void stopBleScanning() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::stopBleScanning);
+            return;
+        }
+        try {
+            bluetoothManager.stopScanning();
+        } catch (RuntimeException exception) {
+            gpsMessage.postValue("Không dừng được BLE scan: " + exception.getMessage());
+        }
+    }
+
+    private void handleBlePayload(DriverBlePayload payload) {
+        if (payload == null) {
+            return;
+        }
+        DashboardState snapshot = getCurrentDashboard();
+        if (snapshot == null || snapshot.getTrip() == null || snapshot.getTrip().getId() == null) {
+            return;
+        }
+        Long currentRouteId = snapshot.getTrip().getRouteId();
+        if (currentRouteId == null || payload.getRouteId() == null
+                || !payload.getRouteId().equals(currentRouteId)) {
+            return;
+        }
+        long targetTripId = snapshot.getTrip().getId();
+        executor.execute(() -> {
+            String note = "BLE check-in route=" + payload.getRouteId()
+                    + " destinationStop=" + payload.getDestinationStopId();
+            Result<PassengerRecordModel> result = passengerRecordRepository.createFromBle(
+                    targetTripId,
+                    payload.getDestinationStopId(),
+                    payload.getDestinationLatitude(),
+                    payload.getDestinationLongitude(),
+                    payload.getPassengerIdentifier(),
+                    note
+            );
+            if (result.isSuccess()) {
+                refreshBoardingRequests();
+                gpsMessage.postValue(result.getMessage() != null
+                        ? result.getMessage()
+                        : "Đã nhận yêu cầu check-in BLE.");
+            } else {
+                gpsMessage.postValue(result.getMessage());
+            }
+        });
+    }
+
     @Override
     protected void onCleared() {
         super.onCleared();
         stopGpsTracking();
+        stopBleScanning();
+        stopFastSignalPolling();
         executor.shutdownNow();
+        fastSignalExecutor.shutdownNow();
     }
 }

@@ -53,6 +53,7 @@
     <string name="action_back">Quay lại</string>
     <string name="action_start_trip">Bắt đầu chuyến</string>
     <string name="action_add_passenger">Thêm khách</string>
+    <string name="action_scan_passengers">Quét hành khách</string>
     <string name="action_dropoff_manifest">Khách xuống bến</string>
     <string name="action_end_trip">Kết thúc chuyến</string>
     <string name="action_ai_assistant">Trợ lý AI</string>

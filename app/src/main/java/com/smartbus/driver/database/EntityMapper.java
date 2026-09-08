@@ -164,9 +164,17 @@ public final class EntityMapper {
         entity.id = model.getId();
         entity.tripId = model.getTripId() != null ? model.getTripId() : 0L;
         entity.stopId = model.getStopId();
+        entity.boardingStopId = model.getBoardingStopId();
+        entity.destinationStopId = model.getDestinationStopId() != null
+                ? model.getDestinationStopId()
+                : model.getStopId();
+        entity.destinationLatitude = model.getDestinationLatitude();
+        entity.destinationLongitude = model.getDestinationLongitude();
+        entity.passengerIdentifier = model.getPassengerIdentifier();
         entity.passengerCount = model.getPassengerCount() != null ? model.getPassengerCount() : 0;
         entity.recordedAt = model.getRecordedAt();
         entity.note = model.getNote();
+        entity.status = model.getStatus() == null ? "ON_BOARD" : model.getStatus();
         return entity;
     }
 
@@ -178,6 +186,12 @@ public final class EntityMapper {
         model.setId(entity.id);
         model.setTripId(entity.tripId);
         model.setStopId(entity.stopId);
+        model.setBoardingStopId(entity.boardingStopId);
+        model.setDestinationStopId(entity.destinationStopId);
+        model.setDestinationLatitude(entity.destinationLatitude);
+        model.setDestinationLongitude(entity.destinationLongitude);
+        model.setPassengerIdentifier(entity.passengerIdentifier);
+        model.setStatus(entity.status);
         model.setPassengerCount(entity.passengerCount);
         model.setRecordedAt(entity.recordedAt);
         model.setNote(entity.note);

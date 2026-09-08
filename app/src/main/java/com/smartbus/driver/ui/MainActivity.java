@@ -43,12 +43,22 @@ public class MainActivity extends AppCompatActivity {
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
                 boolean granted = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION))
                         || Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
+                boolean bluetoothGranted = android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S
+                        || Boolean.TRUE.equals(result.get(Manifest.permission.BLUETOOTH_SCAN));
                 if (granted) {
                     if (tripViewModel.getCurrentDashboard().hasActiveTrip()) {
                         tripViewModel.startGpsTracking();
                     }
-                } else {
+                }
+                if (bluetoothGranted && tripViewModel.getCurrentDashboard().hasActiveTrip()) {
+                    tripViewModel.ensureBleScanning();
+                }
+                if (!granted) {
                     showLocationPermissionDeniedDialog();
+                } else if (!bluetoothGranted && tripViewModel.getCurrentDashboard().hasActiveTrip()) {
+                    com.google.android.material.snackbar.Snackbar
+                            .make(binding.getRoot(), "Chưa có quyền Bluetooth scan nên chưa nhận check-in BLE.", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                            .show();
                 }
             });
 
@@ -241,10 +251,9 @@ public class MainActivity extends AppCompatActivity {
 
     public void ensureLocationPermission() {
         if (!hasLocationPermission()) {
-            permissionLauncher.launch(new String[]{
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-            });
+            permissionLauncher.launch(requiredRuntimePermissions());
+        } else if (!hasBluetoothScanPermission()) {
+            permissionLauncher.launch(requiredRuntimePermissions());
         }
     }
 
@@ -288,6 +297,27 @@ public class MainActivity extends AppCompatActivity {
                 == PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean hasBluetoothScanPermission() {
+        return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private String[] requiredRuntimePermissions() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            return new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_CONNECT
+            };
+        }
+        return new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        };
     }
 
     @Override

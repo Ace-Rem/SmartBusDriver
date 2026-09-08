@@ -80,10 +80,6 @@ public class AuthRepository {
     public void logout() {
         tokenManager.clearSession();
         driverDao.clear();
-        database.tripDao().clear();
-        database.routeDao().clear();
-        database.stopDao().clear();
-        database.passengerRecordDao().clear();
     }
 
     public boolean isLoggedIn() {

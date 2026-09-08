@@ -18,12 +18,42 @@ public interface PassengerRecordDao {
     @Query("SELECT * FROM passenger_records WHERE tripId = :tripId ORDER BY recordedAt DESC")
     List<PassengerRecordEntity> findByTripId(long tripId);
 
+    @Query("SELECT * FROM passenger_records WHERE tripId = :tripId AND status = :status ORDER BY recordedAt DESC")
+    List<PassengerRecordEntity> findByTripIdAndStatus(long tripId, String status);
+
+    @Query("SELECT * FROM passenger_records WHERE tripId = :tripId AND destinationLatitude = :latitude AND destinationLongitude = :longitude AND status = :status ORDER BY recordedAt DESC")
+    List<PassengerRecordEntity> findByDestinationCoordinatesAndStatus(long tripId, double latitude, double longitude, String status);
+
+    @Query("SELECT * FROM passenger_records WHERE pendingSync = 1 ORDER BY recordedAt ASC")
+    List<PassengerRecordEntity> findPendingSync();
+
+    @Query("SELECT * FROM passenger_records WHERE tripId = :tripId AND idempotencyKey = :idempotencyKey LIMIT 1")
+    PassengerRecordEntity findByTripAndIdempotencyKey(long tripId, String idempotencyKey);
+
+    @Query("SELECT * FROM passenger_records WHERE id = :id LIMIT 1")
+    PassengerRecordEntity findById(long id);
+
     @Query("SELECT COALESCE(SUM(passengerCount), 0) FROM passenger_records WHERE tripId = :tripId")
     int sumPassengerCount(long tripId);
+
+    @Query("SELECT COALESCE(SUM(passengerCount), 0) FROM passenger_records WHERE tripId = :tripId AND status = :status")
+    int sumPassengerCountByStatus(long tripId, String status);
+
+    @Query("SELECT COALESCE(SUM(passengerCount), 0) FROM passenger_records WHERE tripId = :tripId AND destinationStopId = :destinationStopId AND status = :status")
+    int sumPassengerCountByDestinationAndStatus(long tripId, long destinationStopId, String status);
+
+    @Query("SELECT COALESCE(SUM(passengerCount), 0) FROM passenger_records WHERE tripId = :tripId AND destinationLatitude = :latitude AND destinationLongitude = :longitude AND status = :status")
+    int sumPassengerCountByDestinationCoordinatesAndStatus(long tripId, double latitude, double longitude, String status);
+
+    @Query("UPDATE passenger_records SET status = :status, pendingSync = 0 WHERE id = :id")
+    void updateStatus(long id, String status);
 
     @Query("DELETE FROM passenger_records WHERE tripId = :tripId")
     void deleteByTripId(long tripId);
 
     @Query("DELETE FROM passenger_records")
     void clear();
+
+    @Query("DELETE FROM passenger_records WHERE id = :id")
+    void deleteById(long id);
 }

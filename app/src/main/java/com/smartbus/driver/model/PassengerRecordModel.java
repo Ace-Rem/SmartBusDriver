@@ -5,6 +5,12 @@ public class PassengerRecordModel {
     private Long id;
     private Long tripId;
     private Long stopId;
+    private Long boardingStopId;
+    private Long destinationStopId;
+    private Double destinationLatitude;
+    private Double destinationLongitude;
+    private String passengerIdentifier;
+    private String status;
     private Integer passengerCount;
     private String recordedAt;
     private String note;
@@ -31,6 +37,54 @@ public class PassengerRecordModel {
 
     public void setStopId(Long stopId) {
         this.stopId = stopId;
+    }
+
+    public Long getBoardingStopId() {
+        return boardingStopId;
+    }
+
+    public void setBoardingStopId(Long boardingStopId) {
+        this.boardingStopId = boardingStopId;
+    }
+
+    public Long getDestinationStopId() {
+        return destinationStopId;
+    }
+
+    public void setDestinationStopId(Long destinationStopId) {
+        this.destinationStopId = destinationStopId;
+    }
+
+    public Double getDestinationLatitude() {
+        return destinationLatitude;
+    }
+
+    public void setDestinationLatitude(Double destinationLatitude) {
+        this.destinationLatitude = destinationLatitude;
+    }
+
+    public Double getDestinationLongitude() {
+        return destinationLongitude;
+    }
+
+    public void setDestinationLongitude(Double destinationLongitude) {
+        this.destinationLongitude = destinationLongitude;
+    }
+
+    public String getPassengerIdentifier() {
+        return passengerIdentifier;
+    }
+
+    public void setPassengerIdentifier(String passengerIdentifier) {
+        this.passengerIdentifier = passengerIdentifier;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 
     public Integer getPassengerCount() {

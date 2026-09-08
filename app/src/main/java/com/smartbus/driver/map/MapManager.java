@@ -62,6 +62,7 @@ public class MapManager {
     private Marker vehicleMarker;
     private final List<Marker> stopMarkers = new ArrayList<>();
     private final Map<Long, Marker> stopMarkerById = new HashMap<>();
+    private Polyline routePolyline;
     private Polyline trailPolyline;
     private final List<GeoPoint> trailPoints = new ArrayList<>();
     /** Only true after user taps "Định vị xe". */
@@ -292,6 +293,7 @@ public class MapManager {
         }
 
         List<GeoPoint> routePoints = collectRoutePoints();
+        redrawRoutePolyline(routePoints);
         if (moveCamera && !routePoints.isEmpty() && !routeOverviewActive && !followVehicle) {
             fitToPoints(routePoints, false);
         }
@@ -421,6 +423,25 @@ public class MapManager {
         mapView.invalidate();
     }
 
+    private void redrawRoutePolyline(List<GeoPoint> routePoints) {
+        if (mapView == null) {
+            return;
+        }
+        if (routePolyline != null) {
+            mapView.getOverlays().remove(routePolyline);
+            routePolyline = null;
+        }
+        if (routePoints == null || routePoints.size() < 2) {
+            return;
+        }
+        routePolyline = new Polyline(mapView);
+        routePolyline.setPoints(new ArrayList<>(routePoints));
+        routePolyline.getOutlinePaint().setColor(COLOR_ROUTE);
+        routePolyline.getOutlinePaint().setStrokeWidth(8f);
+        routePolyline.getOutlinePaint().setAlpha(170);
+        mapView.getOverlays().add(0, routePolyline);
+    }
+
     private void clearTrail() {
         trailPoints.clear();
         if (mapView != null && trailPolyline != null) {
@@ -430,6 +451,10 @@ public class MapManager {
     }
 
     private void clearStops() {
+        if (mapView != null && routePolyline != null) {
+            mapView.getOverlays().remove(routePolyline);
+        }
+        routePolyline = null;
         if (mapView != null) {
             for (Marker marker : stopMarkers) {
                 mapView.getOverlays().remove(marker);

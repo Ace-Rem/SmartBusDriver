@@ -58,6 +58,10 @@ public class RouteRepository {
     }
 
     public Result<RouteModel> getRoute(long routeId) {
+        RouteModel cached = EntityMapper.toRouteModel(routeDao.findById(routeId));
+        if (cached != null) {
+            return Result.success(cached);
+        }
         try {
             Response<ApiResponse<RouteModel>> response = api.getRoute(routeId).execute();
             Result<RouteModel> result = ApiResponseParser.parse(response);
@@ -69,10 +73,6 @@ public class RouteRepository {
             }
             return result;
         } catch (IOException exception) {
-            RouteModel cached = EntityMapper.toRouteModel(routeDao.findById(routeId));
-            if (cached != null) {
-                return Result.success(cached);
-            }
             return ApiResponseParser.fromThrowable(exception);
         }
     }

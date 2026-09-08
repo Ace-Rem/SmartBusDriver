@@ -48,6 +48,7 @@ public class RouteFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         routeViewModel = new ViewModelProvider(this).get(RouteViewModel.class);
         tripViewModel = new ViewModelProvider(requireActivity()).get(TripViewModel.class);
+        tripViewModel.clearActionState();
 
         View toolbar = binding.getRoot().findViewById(R.id.screenToolbar);
         if (toolbar != null) {
@@ -98,6 +99,7 @@ public class RouteFragment extends Fragment {
                     ((MainActivity) requireActivity()).ensureLocationPermissionAndStartGps();
                     ((MainActivity) requireActivity()).navigateTo(R.id.tripFragment);
                 }
+                tripViewModel.clearActionState();
             } else if (state.isError()) {
                 Snackbar.make(
                         binding.snackbarAnchor,

@@ -57,9 +57,11 @@ public class LoginViewModel extends AndroidViewModel {
             Result<LoginResponse> result = authRepository.login(username.trim(), password);
             authRepository.getTokenManager().saveRememberUsername(remember, username.trim());
             if (result.isSuccess()) {
-                bootstrapRepository.sync();
                 loginState.postValue(UiState.success(result.getData(), result.getMessage()));
-                tripRepository.syncHistory();
+                executor.execute(() -> {
+                    bootstrapRepository.sync();
+                    tripRepository.syncHistory();
+                });
             } else {
                 loginState.postValue(UiState.error(result.getMessage()));
             }

@@ -54,10 +54,6 @@ public class RouteViewModel extends AndroidViewModel {
                 } else {
                     routesState.postValue(UiState.success(data));
                 }
-                Result<List<RouteModel>> sync = routeRepository.syncRoutes();
-                if (sync.isSuccess() && sync.getData() != null && !sync.getData().isEmpty()) {
-                    routesState.postValue(UiState.success(sync.getData()));
-                }
             } else {
                 routesState.postValue(UiState.error(result.getMessage()));
             }
@@ -78,10 +74,6 @@ public class RouteViewModel extends AndroidViewModel {
                     stopsState.postValue(UiState.empty("Tuyến chưa có bến"));
                 } else {
                     stopsState.postValue(UiState.success(data));
-                }
-                Result<List<StopModel>> sync = routeRepository.syncStops(route.getId());
-                if (sync.isSuccess() && sync.getData() != null && !sync.getData().isEmpty()) {
-                    stopsState.postValue(UiState.success(sync.getData()));
                 }
             } else {
                 stopsState.postValue(UiState.error(result.getMessage()));

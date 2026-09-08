@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase;
                 TripEntity.class,
                 PassengerRecordEntity.class
         },
-        version = 1,
+        version = 3,
         exportSchema = false
 )
 public abstract class SmartBusDatabase extends RoomDatabase {
