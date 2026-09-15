@@ -87,6 +87,9 @@ public class PassengerRecordViewModel extends AndroidViewModel {
             Result<PassengerRecordModel> result =
                     passengerRecordRepository.create(tripId, stopId, count, note);
             if (result.isSuccess()) {
+                // The local Room row is the source of truth for the UI. The
+                // activity-scoped TripViewModel retries the server write in
+                // the background, even after this fragment/dialog is closed.
                 saveState.postValue(UiState.success(result.getData(), "Đã lưu hành khách"));
             } else {
                 saveState.postValue(UiState.error(result.getMessage()));

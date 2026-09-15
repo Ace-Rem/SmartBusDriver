@@ -10,6 +10,8 @@ import com.smartbus.driver.model.AiAssistantResponse;
 import com.smartbus.driver.model.AiMessage;
 import com.smartbus.driver.model.TripModel;
 import com.smartbus.driver.repository.AiRepository;
+import com.smartbus.driver.repository.DriverAiContextProvider;
+import com.smartbus.driver.repository.DriverAiContextSyncManager;
 import com.smartbus.driver.repository.TripRepository;
 import com.smartbus.driver.utils.Constants;
 import com.smartbus.driver.utils.Result;
@@ -24,6 +26,8 @@ public class AiAssistantViewModel extends AndroidViewModel {
 
     private final AiRepository aiRepository = new AiRepository();
     private final TripRepository tripRepository;
+    private final DriverAiContextProvider contextProvider;
+    private final DriverAiContextSyncManager contextSyncManager;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final MutableLiveData<List<AiMessage>> messages = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<UiState<AiAssistantResponse>> chatState =
@@ -33,6 +37,8 @@ public class AiAssistantViewModel extends AndroidViewModel {
         super(application);
         SmartBusApp app = (SmartBusApp) application;
         tripRepository = new TripRepository(app.getDatabase().tripDao());
+        contextProvider = new DriverAiContextProvider(app.getDatabase());
+        contextSyncManager = app.getAiContextSyncManager();
         List<AiMessage> initial = new ArrayList<>();
         initial.add(new AiMessage(
                 AiMessage.TYPE_ASSISTANT,
@@ -62,12 +68,15 @@ public class AiAssistantViewModel extends AndroidViewModel {
         appendMessage(new AiMessage(AiMessage.TYPE_USER, trimmed));
         chatState.setValue(UiState.loading());
         executor.execute(() -> {
-            Long resolvedTripId = resolveTripId(tripId);
-            if (resolvedTripId == null) {
-                failChat("Cần có chuyến đang chạy để hỏi AI");
+            Map<String, Object> localContext = contextProvider.read();
+            if (contextSyncManager != null) contextSyncManager.submit(localContext);
+            Long resolvedTripId = numberValue(localContext.get("currentTripId"));
+            Long routeId = numberValue(localContext.get("currentRouteId"));
+            if (resolvedTripId == null && routeId == null) {
+                failChat("Cần chọn tuyến hoặc có chuyến đang chạy để hỏi AI");
                 return;
             }
-            Result<AiAssistantResponse> result = aiRepository.chat(resolvedTripId, trimmed, clientContext);
+            Result<AiAssistantResponse> result = aiRepository.chat(resolvedTripId, routeId, trimmed, localContext);
             if (result.isSuccess() && result.getData() != null
                     && result.getData().getAnswer() != null
                     && !result.getData().getAnswer().isBlank()) {
@@ -90,12 +99,15 @@ public class AiAssistantViewModel extends AndroidViewModel {
         appendMessage(new AiMessage(AiMessage.TYPE_USER, "Tóm tắt hành khách"));
         chatState.setValue(UiState.loading());
         executor.execute(() -> {
-            Long resolvedTripId = resolveTripId(tripId);
-            if (resolvedTripId == null) {
-                failChat("Cần có chuyến đang chạy để tóm tắt");
+            Map<String, Object> localContext = contextProvider.read();
+            if (contextSyncManager != null) contextSyncManager.submit(localContext);
+            Long resolvedTripId = numberValue(localContext.get("currentTripId"));
+            Long routeId = numberValue(localContext.get("currentRouteId"));
+            if (resolvedTripId == null && routeId == null) {
+                failChat("Cần chọn tuyến hoặc có chuyến đang chạy để tóm tắt");
                 return;
             }
-            Result<AiAssistantResponse> result = aiRepository.summary(resolvedTripId, clientContext);
+            Result<AiAssistantResponse> result = aiRepository.summary(resolvedTripId, routeId, localContext);
             if (result.isSuccess() && result.getData() != null
                     && result.getData().getAnswer() != null
                     && !result.getData().getAnswer().isBlank()) {
@@ -121,6 +133,77 @@ public class AiAssistantViewModel extends AndroidViewModel {
             return tripResult.getData().getId();
         }
         return null;
+    }
+
+    private Long numberValue(Object raw) {
+        if (raw instanceof Number number) {
+            return number.longValue();
+        }
+        if (raw instanceof String text) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private String answerFromLocalContext(String question, Map<String, Object> context) {
+        String q = question.toLowerCase(java.util.Locale.ROOT);
+        String route = value(context.get("selectedRouteLabel"));
+        String trip = value(context.get("currentTripName"));
+        String current = value(context.get("currentStopName"));
+        String next = value(context.get("nextStopName"));
+        String stops = value(context.get("stopsOnRoute"));
+        if (q.contains("bến tiếp theo") || q.contains("tiếp theo")) {
+            return next == null ? "Chưa xác định được bến tiếp theo từ dữ liệu local." : "Bến tiếp theo là " + next + ".";
+        }
+        if (q.contains("bến hiện tại") || q.contains("đang ở bến nào")) {
+            return current == null ? "Chưa xác định được bến hiện tại từ dữ liệu local." : "Xe đang ở gần " + current + ".";
+        }
+        if (q.contains("xe đang ở đâu") || q.contains("xe ở đâu")) {
+            String latitude = value(context.get("currentLatitude"));
+            String longitude = value(context.get("currentLongitude"));
+            return latitude == null || longitude == null
+                    ? "Chưa có tọa độ local mới nhất của xe."
+                    : "Vị trí local mới nhất của xe: " + latitude + ", " + longitude + ".";
+        }
+        if (q.contains("những bến") || q.contains("các bến") || q.contains("danh sách bến")) {
+            return stops == null || stops.isBlank() ? null : "Các bến của chuyến là: " + stops + ".";
+        }
+        if (q.contains("hành khách") || q.contains("check-in") || q.contains("check in") || q.contains("checkin")) {
+            return "Hiện có " + value(context.get("passengerTotalOnBoard"), "0")
+                    + " hành khách đang trên xe, " + value(context.get("passengerGroupCount"), "0")
+                    + " nhóm check-in local.";
+        }
+        if (q.contains("chuyến") || q.contains("tuyến")) {
+            if (trip != null && route != null) return "Bạn đang chạy " + trip + " trên " + route + ".";
+            if (route != null) return "Bạn đang chạy trên " + route + ".";
+        }
+        if (q.contains("tóm tắt")) {
+            return "Tóm tắt local: " + (trip == null ? "chưa có chuyến" : trip)
+                    + (route == null ? "" : " · " + route)
+                    + "; bến hiện tại: " + (current == null ? "chưa xác định" : current)
+                    + "; bến tiếp theo: " + (next == null ? "hết tuyến" : next)
+                    + "; hành khách trên xe: " + value(context.get("passengerTotalOnBoard"), "0") + ".";
+        }
+        return null;
+    }
+
+    private String value(Object raw) {
+        return value(raw, null);
+    }
+
+    private String value(Object raw, String fallback) {
+        if (raw == null || String.valueOf(raw).isBlank() || "null".equals(raw)) return fallback;
+        return String.valueOf(raw);
+    }
+
+    private AiAssistantResponse response(String answer) {
+        AiAssistantResponse response = new AiAssistantResponse();
+        response.setAnswer(answer);
+        return response;
     }
 
     private void failChat(String message) {

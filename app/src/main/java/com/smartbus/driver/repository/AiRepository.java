@@ -28,9 +28,13 @@ public class AiRepository {
     }
 
     public Result<AiAssistantResponse> chat(long tripId, String question, Map<String, Object> clientContext) {
+        return chat(tripId, null, question, clientContext);
+    }
+
+    public Result<AiAssistantResponse> chat(Long tripId, Long routeId, String question, Map<String, Object> clientContext) {
         try {
             Response<ApiResponse<AiAssistantResponse>> response =
-                    api.aiChat(new AiAssistantRequest(tripId, question, clientContext)).execute();
+                    api.aiChat(new AiAssistantRequest(tripId, routeId, question, clientContext)).execute();
             return parseAi(response);
         } catch (IOException exception) {
             return Result.error("Không kết nối được máy chủ AI (" + exception.getClass().getSimpleName()
@@ -43,9 +47,13 @@ public class AiRepository {
     }
 
     public Result<AiAssistantResponse> summary(long tripId, Map<String, Object> clientContext) {
+        return summary(tripId, null, clientContext);
+    }
+
+    public Result<AiAssistantResponse> summary(Long tripId, Long routeId, Map<String, Object> clientContext) {
         try {
             Response<ApiResponse<AiAssistantResponse>> response =
-                    api.aiSummary(new AiSummaryRequest(tripId, clientContext)).execute();
+                    api.aiSummary(new AiSummaryRequest(tripId, routeId, clientContext)).execute();
             return parseAi(response);
         } catch (IOException exception) {
             return Result.error("Không kết nối được máy chủ AI (" + exception.getClass().getSimpleName()

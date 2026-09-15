@@ -15,7 +15,9 @@ import com.smartbus.driver.utils.ApiResponseParser;
 import com.smartbus.driver.utils.Result;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import retrofit2.Response;
@@ -85,12 +87,35 @@ public class PassengerRecordRepository {
             Long destinationStopId,
             String note
     ) {
-        String passengerIdentifier = "FAST-" + signalId;
+        return createFromFastSignal(tripId, signalId, null, destinationStopId, null, note);
+    }
+
+    public Result<PassengerRecordModel> createFromFastSignal(
+            long tripId,
+            long signalId,
+            Long boardingStopId,
+            Long destinationStopId,
+            String passengerIdentifier,
+            String note
+    ) {
+        String identifier = passengerIdentifier == null || passengerIdentifier.isBlank()
+                ? "FAST-" + signalId : passengerIdentifier;
         String idempotencyKey = tripId + ":fast:" + signalId;
         PassengerRecordEntity existing = passengerRecordDao.findByTripAndIdempotencyKey(
                 tripId,
                 idempotencyKey
         );
+        if (existing == null && passengerIdentifier != null && !passengerIdentifier.isBlank()) {
+            existing = passengerRecordDao.findPendingByPassengerIdentifier(
+                    tripId, passengerIdentifier, destinationStopId);
+            if (existing != null) {
+                existing.idempotencyKey = idempotencyKey;
+                existing.source = "BACKEND_FAST";
+                existing.boardingStopId = boardingStopId;
+                existing.destinationStopId = destinationStopId;
+                passengerRecordDao.upsert(existing);
+            }
+        }
         if (existing != null) {
             return Result.success(
                     EntityMapper.toPassengerRecordModel(existing),
@@ -99,11 +124,11 @@ public class PassengerRecordRepository {
         }
         PassengerRecordModel local = createLocal(
                 tripId,
-                null,
+                boardingStopId,
                 destinationStopId,
                 null,
                 null,
-                passengerIdentifier,
+                identifier,
                 1,
                 "PENDING",
                 note,
@@ -141,13 +166,19 @@ public class PassengerRecordRepository {
         entity.note = note;
         entity.source = source;
         entity.idempotencyKey = idempotencyKey;
-        entity.pendingSync = false;
+        // Manual records are real backend data. Fast/BLE records remain local
+        // until the driver explicitly accepts the passenger.
+        entity.pendingSync = "MANUAL".equals(source);
         passengerRecordDao.upsert(entity);
         return EntityMapper.toPassengerRecordModel(entity);
     }
 
     public void syncPending() {
-        // Driver passenger/check-in data is local-only.
+        List<PassengerRecordEntity> pending = passengerRecordDao.findPendingSync();
+        if (pending == null) return;
+        for (PassengerRecordEntity record : pending) {
+            syncPending(record);
+        }
     }
 
     private void syncPending(PassengerRecordEntity local) {
@@ -234,6 +265,10 @@ public class PassengerRecordRepository {
         return models;
     }
 
+    public PassengerRecordModel getById(long recordId) {
+        return EntityMapper.toPassengerRecordModel(passengerRecordDao.findById(recordId));
+    }
+
     public int getCachedPassengerTotal(long tripId) {
         return passengerRecordDao.sumPassengerCountByStatus(tripId, "ON_BOARD");
     }
@@ -256,11 +291,75 @@ public class PassengerRecordRepository {
     }
 
     public Result<PassengerRecordModel> confirmLocalBoarding(long recordId) {
-        passengerRecordDao.updateStatus(recordId, "ON_BOARD");
+        PassengerRecordEntity record = passengerRecordDao.findById(recordId);
+        if (record == null) {
+            return Result.error("Không tìm thấy bản ghi hành khách.");
+        }
+        record.status = "ON_BOARD";
+        record.pendingSync = true;
+        passengerRecordDao.upsert(record);
+        syncPending(record);
+        PassengerRecordEntity synced = passengerRecordDao.findByTripAndIdempotencyKey(
+                record.tripId,
+                record.idempotencyKey
+        );
+        if (synced == null) {
+            // The API may be temporarily unavailable. Keep the local record
+            // visible and let the next background sync retry it.
+            synced = passengerRecordDao.findById(recordId);
+        }
         return Result.success(
-                EntityMapper.toPassengerRecordModel(passengerRecordDao.findById(recordId)),
+                EntityMapper.toPassengerRecordModel(synced),
                 "Đã thêm hành khách vào chuyến"
         );
+    }
+
+    public Long fastSignalId(long recordId) {
+        PassengerRecordEntity entity = passengerRecordDao.findById(recordId);
+        if (entity == null || entity.idempotencyKey == null) {
+            return null;
+        }
+        String prefix = entity.tripId + ":fast:";
+        if (!entity.idempotencyKey.startsWith(prefix)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(entity.idempotencyKey.substring(prefix.length()));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    public void removePendingFastSignal(long tripId, long signalId) {
+        passengerRecordDao.deletePendingByTripAndIdempotencyKey(
+                tripId, tripId + ":fast:" + signalId);
+    }
+
+    public void migrateTripId(long oldTripId, long newTripId) {
+        if (oldTripId == newTripId) return;
+        passengerRecordDao.migrateTripId(
+                oldTripId,
+                newTripId,
+                oldTripId + ":",
+                newTripId + ":"
+        );
+    }
+
+    public void removePendingFastSignalsNotIn(long tripId, List<Long> activeSignalIds) {
+        Set<Long> active = new HashSet<>();
+        if (activeSignalIds != null) active.addAll(activeSignalIds);
+        List<PassengerRecordEntity> pending = passengerRecordDao.findByTripIdAndStatus(tripId, "PENDING");
+        if (pending == null) return;
+        String prefix = tripId + ":fast:";
+        for (PassengerRecordEntity record : pending) {
+            if (record.idempotencyKey == null || !record.idempotencyKey.startsWith(prefix)) continue;
+            try {
+                long signalId = Long.parseLong(record.idempotencyKey.substring(prefix.length()));
+                if (!active.contains(signalId)) passengerRecordDao.deleteById(record.id);
+            } catch (NumberFormatException ignored) {
+                // Keep malformed local data visible for manual inspection.
+            }
+        }
     }
 
     public void markDroppedOffByCoordinates(long tripId, double latitude, double longitude) {
@@ -294,6 +393,11 @@ public class PassengerRecordRepository {
             TripModel trip = new TripModel();
             trip.setId(record.tripId);
             request.setTrip(trip);
+            StopModel boarding = new StopModel();
+            boarding.setId(record.boardingStopId);
+            boarding.setName(record.boardingStopId == null
+                    ? null : "Bến lên #" + record.boardingStopId);
+            request.setBoardingStop(boarding);
             StopModel destination = new StopModel();
             destination.setId(record.destinationStopId);
             destination.setLatitude(record.destinationLatitude);

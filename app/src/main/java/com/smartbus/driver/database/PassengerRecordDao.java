@@ -30,6 +30,9 @@ public interface PassengerRecordDao {
     @Query("SELECT * FROM passenger_records WHERE tripId = :tripId AND idempotencyKey = :idempotencyKey LIMIT 1")
     PassengerRecordEntity findByTripAndIdempotencyKey(long tripId, String idempotencyKey);
 
+    @Query("SELECT * FROM passenger_records WHERE tripId = :tripId AND passengerIdentifier = :passengerIdentifier AND destinationStopId = :destinationStopId AND status = 'PENDING' LIMIT 1")
+    PassengerRecordEntity findPendingByPassengerIdentifier(long tripId, String passengerIdentifier, Long destinationStopId);
+
     @Query("SELECT * FROM passenger_records WHERE id = :id LIMIT 1")
     PassengerRecordEntity findById(long id);
 
@@ -56,4 +59,10 @@ public interface PassengerRecordDao {
 
     @Query("DELETE FROM passenger_records WHERE id = :id")
     void deleteById(long id);
+
+    @Query("DELETE FROM passenger_records WHERE tripId = :tripId AND idempotencyKey = :idempotencyKey AND status = 'PENDING'")
+    void deletePendingByTripAndIdempotencyKey(long tripId, String idempotencyKey);
+
+    @Query("UPDATE passenger_records SET tripId = :newTripId, idempotencyKey = CASE WHEN idempotencyKey IS NULL THEN NULL ELSE REPLACE(idempotencyKey, :oldTripPrefix, :newTripPrefix) END WHERE tripId = :oldTripId")
+    void migrateTripId(long oldTripId, long newTripId, String oldTripPrefix, String newTripPrefix);
 }

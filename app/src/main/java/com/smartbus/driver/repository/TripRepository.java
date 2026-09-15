@@ -1,6 +1,7 @@
 package com.smartbus.driver.repository;
 
 import com.smartbus.driver.database.EntityMapper;
+import com.smartbus.driver.database.PassengerRecordDao;
 import com.smartbus.driver.database.TripDao;
 import com.smartbus.driver.database.TripEntity;
 import com.smartbus.driver.model.ApiResponse;
@@ -23,14 +24,18 @@ import retrofit2.Response;
 
 public class TripRepository {
 
-    private static final long MIN_LOCAL_TRIP_ID = 1_000_000_000_000L;
-
     private final SmartBusApi api;
     private final TripDao tripDao;
+    private final PassengerRecordDao passengerRecordDao;
 
     public TripRepository(TripDao tripDao) {
+        this(tripDao, null);
+    }
+
+    public TripRepository(TripDao tripDao, PassengerRecordDao passengerRecordDao) {
         this.api = RetrofitClient.getApi();
         this.tripDao = tripDao;
+        this.passengerRecordDao = passengerRecordDao;
     }
 
     public Result<TripModel> startTrip(long routeId) {
@@ -39,16 +44,20 @@ public class TripRepository {
     }
 
     public TripModel startTripLocally(long routeId) {
-        TripEntity existing = tripDao.findLocalByStatus(Constants.TRIP_STATUS_IN_PROGRESS, MIN_LOCAL_TRIP_ID);
+        TripEntity existing = tripDao.findByStatus(Constants.TRIP_STATUS_IN_PROGRESS);
         if (existing != null) {
             return EntityMapper.toTripModel(existing);
         }
         TripEntity entity = new TripEntity();
-        entity.id = System.currentTimeMillis();
+        // Negative IDs are explicitly reserved for local-only trips. Once
+        // deferred sync returns, the real backend ID can replace this row.
+        entity.id = -System.currentTimeMillis();
         entity.routeId = routeId;
         entity.status = Constants.TRIP_STATUS_IN_PROGRESS;
         entity.startedAt = now();
-        entity.pendingStartSync = false;
+        // The local trip is immediately usable by Map, BLE and AI. Backend
+        // synchronization is deliberately deferred to the background.
+        entity.pendingStartSync = true;
         tripDao.upsert(entity);
         return EntityMapper.toTripModel(entity);
     }
@@ -59,11 +68,8 @@ public class TripRepository {
             return;
         }
         for (TripEntity entity : pending) {
-            if (!Constants.TRIP_STATUS_COMPLETED.equals(entity.status) || !entity.pendingEndSync) {
-                continue;
-            }
             TripEntity latest = entity.pendingStartSync ? syncStart(entity) : entity;
-            if (latest != null && latest.pendingEndSync) {
+            if (latest != null && latest.pendingEndSync && latest.id > 0) {
                 syncEnd(latest);
             }
         }
@@ -77,8 +83,20 @@ public class TripRepository {
             if (result.isSuccess() && result.getData() != null) {
                 TripEntity synced = EntityMapper.toEntity(result.getData());
                 if (synced != null) {
+                    if (synced.currentStopId == null) {
+                        synced.currentStopId = local.currentStopId;
+                    }
+                    if (synced.currentLatitude == null) {
+                        synced.currentLatitude = local.currentLatitude;
+                    }
+                    if (synced.currentLongitude == null) {
+                        synced.currentLongitude = local.currentLongitude;
+                    }
                     synced.pendingStartSync = false;
                     synced.pendingEndSync = local.pendingEndSync;
+                    if (Constants.TRIP_STATUS_IN_PROGRESS.equals(local.status)) {
+                        synced.status = local.status;
+                    }
                     if (local.pendingEndSync) {
                         synced.status = local.status;
                         synced.endedAt = local.endedAt;
@@ -86,6 +104,14 @@ public class TripRepository {
                     synced.localSyncError = null;
                     if (local.id < 0) {
                         tripDao.deleteById(local.id);
+                        if (passengerRecordDao != null) {
+                            passengerRecordDao.migrateTripId(
+                                    local.id,
+                                    synced.id,
+                                    local.id + ":",
+                                    synced.id + ":"
+                            );
+                        }
                         tripDao.upsert(synced);
                     } else {
                         synced.id = local.id;
@@ -132,13 +158,13 @@ public class TripRepository {
 
     public Result<TripModel> getCurrentTrip() {
         TripModel cached = EntityMapper.toTripModel(
-                tripDao.findLocalByStatus(Constants.TRIP_STATUS_IN_PROGRESS, MIN_LOCAL_TRIP_ID)
+                tripDao.findByStatus(Constants.TRIP_STATUS_IN_PROGRESS)
         );
         return Result.success(cached);
     }
 
     public Result<TripModel> endCurrentTrip() {
-        TripEntity active = tripDao.findLocalByStatus(Constants.TRIP_STATUS_IN_PROGRESS, MIN_LOCAL_TRIP_ID);
+        TripEntity active = tripDao.findByStatus(Constants.TRIP_STATUS_IN_PROGRESS);
         if (active == null) {
             return Result.success(null);
         }
@@ -155,13 +181,32 @@ public class TripRepository {
         tripDao.updateLocation(tripId, latitude, longitude);
     }
 
+    public void updateLocalCurrentStop(long tripId, Long stopId) {
+        tripDao.updateCurrentStop(tripId, stopId);
+    }
+
     public Result<UpdateLocationResponse> updateLocation(double latitude, double longitude) {
         try {
             Response<ApiResponse<UpdateLocationResponse>> response =
                     api.updateLocation(new UpdateLocationRequest(latitude, longitude)).execute();
             Result<UpdateLocationResponse> result = ApiResponseParser.parse(response);
             if (result.isSuccess() && result.getData() != null) {
-                cacheTrip(result.getData().getTrip());
+                TripModel remoteTrip = result.getData().getTrip();
+                TripEntity localActive = tripDao.findByStatus(Constants.TRIP_STATUS_IN_PROGRESS);
+                if (localActive != null && remoteTrip != null) {
+                    // Keep the local identity/status authoritative while the
+                    // server catches up. Only merge facts produced by GPS.
+                    if (remoteTrip.getCurrentStopId() != null) {
+                        localActive.currentStopId = remoteTrip.getCurrentStopId();
+                    }
+                    if (remoteTrip.getCurrentLatitude() != null && remoteTrip.getCurrentLongitude() != null) {
+                        localActive.currentLatitude = remoteTrip.getCurrentLatitude();
+                        localActive.currentLongitude = remoteTrip.getCurrentLongitude();
+                    }
+                    tripDao.upsert(localActive);
+                } else {
+                    cacheTrip(remoteTrip);
+                }
             }
             return result;
         } catch (IOException exception) {

@@ -72,6 +72,7 @@ public class PassengerDialogFragment extends androidx.appcompat.app.AppCompatDia
             binding.savePassengerButton.setEnabled(!state.isLoading());
             if (state.isSuccess()) {
                 tripViewModel.refreshPassengerTotal();
+                tripViewModel.syncPassengerRecordsInBackground();
                 dismiss();
             } else if (state.isError()) {
                 Snackbar.make(

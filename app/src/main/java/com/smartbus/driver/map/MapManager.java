@@ -146,7 +146,7 @@ public class MapManager {
     }
 
     public void updateVehiclePosition(double latitude, double longitude) {
-        if (mapView == null) {
+        if (mapView == null || !validCoordinate(latitude, longitude)) {
             return;
         }
         GeoPoint position = new GeoPoint(latitude, longitude);
@@ -234,7 +234,7 @@ public class MapManager {
 
     public void focusStop(StopModel stop) {
         if (mapView == null || stop == null
-                || stop.getLatitude() == null || stop.getLongitude() == null) {
+                || !validCoordinate(stop.getLatitude(), stop.getLongitude())) {
             return;
         }
         followVehicle = false;
@@ -276,7 +276,7 @@ public class MapManager {
         }
 
         for (StopModel stop : lastStops) {
-            if (stop.getLatitude() == null || stop.getLongitude() == null) {
+            if (!validCoordinate(stop.getLatitude(), stop.getLongitude())) {
                 continue;
             }
             GeoPoint point = new GeoPoint(stop.getLatitude(), stop.getLongitude());
@@ -309,12 +309,21 @@ public class MapManager {
         }
         if (points.isEmpty()) {
             for (StopModel stop : lastStops) {
-                if (stop.getLatitude() != null && stop.getLongitude() != null) {
+                if (validCoordinate(stop.getLatitude(), stop.getLongitude())) {
                     points.add(new GeoPoint(stop.getLatitude(), stop.getLongitude()));
                 }
             }
         }
         return points;
+    }
+
+    private boolean validCoordinate(Double latitude, Double longitude) {
+        return latitude != null && longitude != null
+                && !latitude.isNaN() && !latitude.isInfinite()
+                && !longitude.isNaN() && !longitude.isInfinite()
+                && latitude >= -90d && latitude <= 90d
+                && longitude >= -180d && longitude <= 180d
+                && (latitude != 0d || longitude != 0d);
     }
 
     private void fitToPoints(List<GeoPoint> points, boolean animated) {

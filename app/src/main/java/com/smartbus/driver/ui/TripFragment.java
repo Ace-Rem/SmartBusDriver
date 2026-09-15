@@ -283,7 +283,12 @@ public class TripFragment extends Fragment {
                     : getString(R.string.placeholder_dash);
             String boardingStop = request.getBoardingStop() != null ? request.getBoardingStop().getName() : "-";
             String destinationStop = request.getDestinationStop() != null ? request.getDestinationStop().getName() : "-";
-            title.setText(passengerName + " · " + request.getStatus());
+            DashboardState dashboard = tripViewModel.getCurrentDashboard();
+            String routeLabel = dashboard.getRoute() == null
+                    ? "Tuyến chưa xác định"
+                    : dashboard.getRoute().getCode() + " · " + dashboard.getRoute().getName();
+            title.setText("Chuyến #" + (dashboard.getTrip() == null ? "-" : dashboard.getTrip().getId())
+                    + " · " + routeLabel + " · " + passengerName + " · " + request.getStatus());
             detail.setText("Lên: " + boardingStop
                     + "\nXuống: " + destinationStop
                     + "\nBluetooth: " + request.getBluetoothIdentifier());

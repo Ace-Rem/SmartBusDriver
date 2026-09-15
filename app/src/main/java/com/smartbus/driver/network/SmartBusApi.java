@@ -2,6 +2,8 @@ package com.smartbus.driver.network;
 
 import com.smartbus.driver.model.AiAssistantRequest;
 import com.smartbus.driver.model.AiAssistantResponse;
+import com.smartbus.driver.model.AiContextSyncRequest;
+import com.smartbus.driver.model.AiContextSyncResponse;
 import com.smartbus.driver.model.AiSummaryRequest;
 import com.smartbus.driver.model.ApiResponse;
 import com.smartbus.driver.model.BoardingRequestModel;
@@ -10,6 +12,8 @@ import com.smartbus.driver.model.CreatePassengerRecordRequest;
 import com.smartbus.driver.model.CreateTripRequest;
 import com.smartbus.driver.model.DriverModel;
 import com.smartbus.driver.model.FastBoardingSignalModel;
+import com.smartbus.driver.model.FastBoardingSignalAcceptRequest;
+import com.smartbus.driver.model.FastBoardingAcceptanceModel;
 import com.smartbus.driver.model.LoginRequest;
 import com.smartbus.driver.model.LoginResponse;
 import com.smartbus.driver.model.PassengerRecordModel;
@@ -88,6 +92,23 @@ public interface SmartBusApi {
             @Query("afterId") long afterId
     );
 
+    @GET("fast-boarding-signals/cancelled")
+    Call<ApiResponse<List<FastBoardingSignalModel>>> getCancelledFastBoardingSignals(
+            @Query("routeId") long routeId,
+            @Query("afterId") long afterId
+    );
+
+    @POST("fast-boarding-signals/{signalId}/accept")
+    Call<ApiResponse<FastBoardingAcceptanceModel>> acceptFastBoardingSignal(
+            @Path("signalId") long signalId,
+            @Body FastBoardingSignalAcceptRequest request
+    );
+
+    @POST("fast-boarding-signals/accept")
+    Call<ApiResponse<FastBoardingAcceptanceModel>> acceptFastBoardingSignalByIdentity(
+            @Body FastBoardingSignalAcceptRequest request
+    );
+
     @POST("boarding-requests/{id}/confirm-boarding")
     Call<ApiResponse<BoardingRequestModel>> confirmBoarding(@Path("id") long requestId);
 
@@ -96,4 +117,7 @@ public interface SmartBusApi {
 
     @POST("ai/summary")
     Call<ApiResponse<AiAssistantResponse>> aiSummary(@Body AiSummaryRequest request);
+
+    @POST("ai/context")
+    Call<ApiResponse<AiContextSyncResponse>> syncAiContext(@Body AiContextSyncRequest request);
 }

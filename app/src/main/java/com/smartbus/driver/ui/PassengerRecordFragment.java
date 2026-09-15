@@ -73,6 +73,7 @@ public class PassengerRecordFragment extends Fragment {
             binding.passengerProgress.setVisibility(state.isLoading() ? View.VISIBLE : View.GONE);
             if (state.isSuccess()) {
                 tripViewModel.refreshPassengerTotal();
+                tripViewModel.syncPassengerRecordsInBackground();
                 Snackbar.make(
                         binding.snackbarAnchor,
                         state.getMessage() != null ? state.getMessage() : getString(R.string.save_passenger),

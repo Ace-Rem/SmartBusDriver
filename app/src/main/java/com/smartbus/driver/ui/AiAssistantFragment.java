@@ -14,13 +14,8 @@ import com.smartbus.driver.R;
 import com.smartbus.driver.adapter.AiMessageAdapter;
 import com.smartbus.driver.databinding.FragmentAiAssistantBinding;
 import com.smartbus.driver.model.DashboardState;
-import com.smartbus.driver.model.RouteModel;
-import com.smartbus.driver.model.StopModel;
-import com.smartbus.driver.model.TripModel;
 import com.smartbus.driver.viewmodel.AiAssistantViewModel;
 import com.smartbus.driver.viewmodel.TripViewModel;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 public class AiAssistantFragment extends Fragment {
 
@@ -74,7 +69,7 @@ public class AiAssistantFragment extends Fragment {
         );
         binding.aiSuggestionPassengerButton.setOnClickListener(v -> {
             Long tripId = currentTripId();
-            aiViewModel.requestSummary(tripId, buildDriverAiClientContext());
+            aiViewModel.requestSummary(tripId);
         });
 
         aiViewModel.getMessages().observe(getViewLifecycleOwner(), messages -> {
@@ -108,49 +103,13 @@ public class AiAssistantFragment extends Fragment {
     }
 
     private void sendQuestion(String question) {
-        aiViewModel.sendQuestion(currentTripId(), question, buildDriverAiClientContext());
+        aiViewModel.sendQuestion(currentTripId(), question);
     }
 
     @Nullable
     private Long currentTripId() {
         DashboardState dashboard = tripViewModel.getCurrentDashboard();
         return dashboard.getTrip() != null ? dashboard.getTrip().getId() : null;
-    }
-
-    private Map<String, Object> buildDriverAiClientContext() {
-        Map<String, Object> context = new LinkedHashMap<>();
-        context.put("app", "smartbus-driver");
-        DashboardState dashboard = tripViewModel.getCurrentDashboard();
-        if (dashboard == null) {
-            return context;
-        }
-        TripModel trip = dashboard.getTrip();
-        RouteModel route = dashboard.getRoute();
-        StopModel currentStop = dashboard.getCurrentStop();
-        StopModel nextStop = dashboard.getNextStop();
-        context.put("selectedTripId", trip == null ? null : trip.getId());
-        context.put("tripStatusOnApp", trip == null ? null : trip.getStatus());
-        context.put("selectedRouteId", route == null ? null : route.getId());
-        context.put("selectedRouteLabel", route == null ? null : route.getCode() + " - " + route.getName());
-        putStopContext(context, "selectedBoardingStop", currentStop);
-        putStopContext(context, "selectedDestinationStop", nextStop);
-        putStopContext(context, "currentStopOnApp", currentStop);
-        putStopContext(context, "nextStopOnApp", nextStop);
-        context.put("currentLatitude", trip == null ? null : trip.getCurrentLatitude());
-        context.put("currentLongitude", trip == null ? null : trip.getCurrentLongitude());
-        context.put("passengerTotalOnApp", dashboard.getPassengerTotal());
-        context.put("passengersAlightingOnApp", dashboard.getPassengersAlighting());
-        context.put("gpsStatusOnApp", dashboard.getGpsStatus());
-        context.put("notificationOnApp", dashboard.getNotification());
-        return context;
-    }
-
-    private void putStopContext(Map<String, Object> context, String prefix, StopModel stop) {
-        context.put(prefix + "Id", stop == null ? null : stop.getId());
-        context.put(prefix + "Name", stop == null ? null : stop.getName());
-        context.put(prefix + "Order", stop == null ? null : stop.getStopOrder());
-        context.put(prefix + "Latitude", stop == null ? null : stop.getLatitude());
-        context.put(prefix + "Longitude", stop == null ? null : stop.getLongitude());
     }
 
     @Override

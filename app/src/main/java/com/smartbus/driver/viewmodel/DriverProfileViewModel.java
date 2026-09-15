@@ -10,6 +10,7 @@ import com.smartbus.driver.model.DriverModel;
 import com.smartbus.driver.model.RouteModel;
 import com.smartbus.driver.model.TripModel;
 import com.smartbus.driver.repository.AuthRepository;
+import com.smartbus.driver.repository.DriverAiContextSyncManager;
 import com.smartbus.driver.repository.RouteRepository;
 import com.smartbus.driver.repository.TripRepository;
 import com.smartbus.driver.utils.Constants;
@@ -23,6 +24,7 @@ public class DriverProfileViewModel extends AndroidViewModel {
     private final AuthRepository authRepository;
     private final TripRepository tripRepository;
     private final RouteRepository routeRepository;
+    private final DriverAiContextSyncManager aiContextSyncManager;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final MutableLiveData<UiState<DriverModel>> profileState =
             new MutableLiveData<>(UiState.loading());
@@ -36,6 +38,7 @@ public class DriverProfileViewModel extends AndroidViewModel {
         authRepository = new AuthRepository(app.getTokenManager(), app.getDatabase());
         tripRepository = new TripRepository(app.getDatabase().tripDao());
         routeRepository = new RouteRepository(app.getDatabase().routeDao(), app.getDatabase().stopDao());
+        aiContextSyncManager = app.getAiContextSyncManager();
     }
 
     public LiveData<UiState<DriverModel>> getProfileState() {
@@ -95,6 +98,7 @@ public class DriverProfileViewModel extends AndroidViewModel {
     }
 
     public void logout() {
+        if (aiContextSyncManager != null) aiContextSyncManager.clearPending();
         loggedOut.setValue(true);
         executor.execute(() -> {
             authRepository.logout();

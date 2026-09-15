@@ -5,12 +5,14 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import com.smartbus.driver.database.SmartBusDatabase;
 import com.smartbus.driver.network.RetrofitClient;
+import com.smartbus.driver.repository.DriverAiContextSyncManager;
 import com.smartbus.driver.utils.TokenManager;
 
 public class SmartBusApp extends Application {
 
     private TokenManager tokenManager;
     private SmartBusDatabase database;
+    private DriverAiContextSyncManager aiContextSyncManager;
     private final MutableLiveData<Boolean> sessionExpired = new MutableLiveData<>(false);
 
     @Override
@@ -19,6 +21,7 @@ public class SmartBusApp extends Application {
         tokenManager = new TokenManager(this);
         database = SmartBusDatabase.getInstance(this);
         RetrofitClient.init(tokenManager, this);
+        aiContextSyncManager = new DriverAiContextSyncManager();
         com.smartbus.driver.map.MapManager.initOsmConfiguration(this);
     }
 
@@ -28,6 +31,10 @@ public class SmartBusApp extends Application {
 
     public SmartBusDatabase getDatabase() {
         return database;
+    }
+
+    public DriverAiContextSyncManager getAiContextSyncManager() {
+        return aiContextSyncManager;
     }
 
     public LiveData<Boolean> getSessionExpired() {
