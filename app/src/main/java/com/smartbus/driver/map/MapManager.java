@@ -16,13 +16,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.osmdroid.config.Configuration;
 import org.osmdroid.events.MapListener;
 import org.osmdroid.events.ScrollEvent;
 import org.osmdroid.events.ZoomEvent;
-import org.osmdroid.tileprovider.tilesource.XYTileSource;
 import org.osmdroid.util.BoundingBox;
 import org.osmdroid.util.GeoPoint;
+import org.osmdroid.tileprovider.MapTileProviderBase;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
 import org.osmdroid.views.overlay.Polyline;
@@ -31,8 +30,7 @@ import org.osmdroid.views.overlay.compass.CompassOverlay;
 import org.osmdroid.views.overlay.gestures.RotationGestureOverlay;
 
 /**
- * OpenStreetMap map controller (native equivalent of Leaflet
- * L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')).
+ * OpenStreetMap map controller using the official OSM raster tile endpoint.
  */
 public class MapManager {
 
@@ -43,20 +41,6 @@ public class MapManager {
     private static final int COLOR_ERROR = 0xFFC62828;
     private static final int COLOR_WHITE = 0xFFFFFFFF;
     private static final GeoPoint DEFAULT_CENTER = new GeoPoint(10.7769, 106.7009);
-
-    private static final XYTileSource OPEN_STREET_MAP = new XYTileSource(
-            "OpenStreetMap",
-            1,
-            19,
-            256,
-            ".png",
-            new String[]{
-                    "https://a.tile.openstreetmap.org/",
-                    "https://b.tile.openstreetmap.org/",
-                    "https://c.tile.openstreetmap.org/"
-            },
-            "© OpenStreetMap contributors"
-    );
 
     private MapView mapView;
     private Marker vehicleMarker;
@@ -76,15 +60,11 @@ public class MapManager {
 
     public static void initOsmConfiguration(Context context) {
         Context appContext = context.getApplicationContext();
-        Configuration.getInstance().load(
+        OfflineMapSupport.configure(
                 appContext,
+                BuildConfig.APPLICATION_ID + "/" + BuildConfig.VERSION_NAME,
                 appContext.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
         );
-        Configuration.getInstance().setUserAgentValue(
-                BuildConfig.APPLICATION_ID + "/" + BuildConfig.VERSION_NAME
-        );
-        Configuration.getInstance().setTileDownloadThreads((short) 4);
-        Configuration.getInstance().setCacheMapTileCount((short) 200);
     }
 
     public void attachMap(MapView mapView) {
@@ -92,11 +72,17 @@ public class MapManager {
         if (mapView == null) {
             return;
         }
-        mapView.setTileSource(OPEN_STREET_MAP);
+        MapTileProviderBase tileProvider = OfflineMapSupport.createTileProvider(
+                mapView.getContext(), BuildConfig.STADIA_MAPS_API_KEY);
+        if (tileProvider != null) {
+            mapView.setTileProvider(tileProvider);
+        }
+        mapView.setTileSource(OfflineMapSupport.onlineTileSource(
+                mapView.getContext(), BuildConfig.STADIA_MAPS_API_KEY));
         mapView.setMultiTouchControls(true);
         mapView.setTilesScaledToDpi(true);
         mapView.setMinZoomLevel(3.0);
-        mapView.setMaxZoomLevel(19.0);
+        mapView.setMaxZoomLevel(20.0);
         mapView.getController().setZoom((double) Constants.MAP_DEFAULT_ZOOM);
         mapView.getController().setCenter(DEFAULT_CENTER);
         mapView.getOverlayManager().getTilesOverlay().setEnabled(true);
@@ -195,6 +181,13 @@ public class MapManager {
 
     public void showStops(List<StopModel> stops) {
         lastStops = stops != null ? new ArrayList<>(stops) : new ArrayList<>();
+        List<double[]> coordinates = new ArrayList<>();
+        for (StopModel stop : lastStops) {
+            if (stop != null && validCoordinate(stop.getLatitude(), stop.getLongitude())) {
+                coordinates.add(new double[]{stop.getLatitude(), stop.getLongitude()});
+            }
+        }
+        OfflineMapSupport.logCoverage("driver", coordinates);
         redrawStops(false);
         if (!hasFittedRouteOnce && !lastStops.isEmpty()) {
             hasFittedRouteOnce = true;

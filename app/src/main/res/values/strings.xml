@@ -61,8 +61,8 @@
 
     <string name="map_title">Bản đồ chuyến xe</string>
     <string name="map_status">Đang theo dõi tuyến</string>
-    <string name="map_osm_status">OpenStreetMap · không cần API key</string>
-    <string name="map_osm_attribution">© OpenStreetMap contributors</string>
+    <string name="map_osm_status">Stadia Maps · dự phòng OpenStreetMap</string>
+    <string name="map_osm_attribution">© Stadia Maps © OpenMapTiles © OpenStreetMap</string>
     <string name="map_sheet_drag_hint">Kéo xuống để mở rộng bản đồ · kéo lên để xem thông tin</string>
     <string name="map_sheet_drag_up_hint">Kéo lên để xem lại thông tin chuyến</string>
     <string name="map_no_active_trip">Chưa có chuyến đang chạy</string>

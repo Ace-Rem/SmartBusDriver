@@ -4,4 +4,5 @@
 ## Backend API base URL (must end with /api/)
 # API_BASE_URL=https://smartbus-w5qy.onrender.com/api/
 
-## Map tiles use OpenStreetMap via osmdroid (no Google Maps API key required).
+## Stadia Maps raster tiles (keep the real key only in local.properties; do not commit it).
+# STADIA_MAPS_API_KEY=your-stadia-api-key

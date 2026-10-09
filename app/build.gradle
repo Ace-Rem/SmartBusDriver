@@ -21,6 +21,18 @@ def resolveApiBaseUrl = { String fallback ->
     return fallback
 }
 
+def resolveStadiaMapsApiKey = {
+    def fromLocal = localProperties.getProperty("STADIA_MAPS_API_KEY")
+    if (fromLocal != null && !fromLocal.trim().isEmpty()) {
+        return fromLocal.trim()
+    }
+    def fromProject = project.findProperty("STADIA_MAPS_API_KEY")
+    if (fromProject != null && !fromProject.toString().trim().isEmpty()) {
+        return fromProject.toString().trim()
+    }
+    return ""
+}
+
 android {
     namespace 'com.smartbus.driver'
     compileSdk {
@@ -33,8 +45,8 @@ android {
         applicationId "com.smartbus.driver"
         minSdk 28
         targetSdk 36
-        versionCode 2
-        versionName "1.2"
+        versionCode 5
+        versionName "1.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders = [
@@ -45,7 +57,9 @@ android {
     buildTypes {
         debug {
             def apiBaseUrl = resolveApiBaseUrl("https://smartbus-w5qy.onrender.com/api/")
+            def stadiaMapsApiKey = resolveStadiaMapsApiKey()
             buildConfigField "String", "BASE_URL", "\"${apiBaseUrl}\""
+            buildConfigField "String", "STADIA_MAPS_API_KEY", "\"${stadiaMapsApiKey}\""
             // Cleartext only needed for local emulator/LAN HTTP; HTTPS Render does not need it.
             boolean needsCleartext = apiBaseUrl.startsWith("http://")
             manifestPlaceholders.usesCleartextTraffic = needsCleartext ? "true" : "false"
@@ -55,7 +69,9 @@ android {
                 enable false
             }
             def apiBaseUrl = resolveApiBaseUrl("https://smartbus-w5qy.onrender.com/api/")
+            def stadiaMapsApiKey = resolveStadiaMapsApiKey()
             buildConfigField "String", "BASE_URL", "\"${apiBaseUrl}\""
+            buildConfigField "String", "STADIA_MAPS_API_KEY", "\"${stadiaMapsApiKey}\""
             manifestPlaceholders.usesCleartextTraffic = "false"
         }
     }
