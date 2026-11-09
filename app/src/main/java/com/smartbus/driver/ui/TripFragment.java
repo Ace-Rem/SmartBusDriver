@@ -289,13 +289,25 @@ public class TripFragment extends Fragment {
                     : dashboard.getRoute().getCode() + " · " + dashboard.getRoute().getName();
             title.setText("Chuyến #" + (dashboard.getTrip() == null ? "-" : dashboard.getTrip().getId())
                     + " · " + routeLabel + " · " + passengerName + " · " + request.getStatus());
-            detail.setText("Lên: " + boardingStop
+            boolean bleRequest = request.getNote() != null
+                    && request.getNote().startsWith("BLE check-in");
+            boolean serverRequest = request.getNote() != null
+                    && request.getNote().startsWith("Backend fast signal");
+            boolean lanRequest = request.getNote() != null
+                    && request.getNote().startsWith("LAN check-in");
+            String requestNotice = bleRequest || lanRequest || serverRequest
+                    ? "1 khách mới với bến xuống là " + destinationStop
+                    : null;
+            detail.setText((requestNotice == null ? "" : requestNotice + "\n")
+                    + "Lên: " + boardingStop
                     + "\nXuống: " + destinationStop
                     + "\nBluetooth: " + request.getBluetoothIdentifier());
 
-            boolean canConfirm = "PENDING".equals(request.getStatus()) || "CONFIRMED".equals(request.getStatus());
+            boolean canConfirm = "PENDING".equals(request.getStatus())
+                    || "CONFIRMED".equals(request.getStatus())
+                    || "ON_BOARD_UPDATE".equals(request.getStatus());
             confirm.setVisibility(canConfirm ? View.VISIBLE : View.GONE);
-            confirm.setText("Thêm vào");
+            confirm.setText("Thêm vào (+1 khách)");
             confirm.setOnClickListener(v -> confirmBoardingRequest(request));
             binding.boardingRequestsContainer.addView(item);
         }
@@ -307,7 +319,7 @@ public class TripFragment extends Fragment {
         }
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(R.string.boarding_request_confirm)
-                .setMessage("Thêm hành khách từ check-in Bluetooth vào bộ đếm chuyến "
+                .setMessage("Thêm hành khách từ check-in BLE/LAN/server vào bộ đếm chuyến "
                         + request.getBluetoothIdentifier() + "?")
                 .setNegativeButton(R.string.dialog_cancel, null)
                 .setPositiveButton(R.string.dialog_confirm,

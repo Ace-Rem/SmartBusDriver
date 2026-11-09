@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.smartbus.driver.model.AiAssistantRequest;
 import com.smartbus.driver.model.AiAssistantResponse;
 import com.smartbus.driver.model.AiSummaryRequest;
+import com.smartbus.driver.model.AiConversationMessage;
 import com.smartbus.driver.model.ApiResponse;
 import com.smartbus.driver.model.ErrorResponse;
 import com.smartbus.driver.network.RetrofitClient;
@@ -12,6 +13,7 @@ import com.smartbus.driver.utils.ApiResponseParser;
 import com.smartbus.driver.utils.Result;
 import java.io.IOException;
 import java.util.Map;
+import java.util.List;
 import retrofit2.Response;
 
 public class AiRepository {
@@ -32,9 +34,15 @@ public class AiRepository {
     }
 
     public Result<AiAssistantResponse> chat(Long tripId, Long routeId, String question, Map<String, Object> clientContext) {
+        return chat(tripId, routeId, question, clientContext, null);
+    }
+
+    public Result<AiAssistantResponse> chat(Long tripId, Long routeId, String question,
+                                            Map<String, Object> clientContext,
+                                            List<AiConversationMessage> history) {
         try {
             Response<ApiResponse<AiAssistantResponse>> response =
-                    api.aiChat(new AiAssistantRequest(tripId, routeId, question, clientContext)).execute();
+                    api.aiChat(request(tripId, routeId, question, clientContext, history)).execute();
             return parseAi(response);
         } catch (IOException exception) {
             return Result.error("Không kết nối được máy chủ AI (" + exception.getClass().getSimpleName()
@@ -51,14 +59,26 @@ public class AiRepository {
     }
 
     public Result<AiAssistantResponse> summary(Long tripId, Long routeId, Map<String, Object> clientContext) {
+        return summary(tripId, routeId, clientContext, null);
+    }
+
+    public Result<AiAssistantResponse> summary(Long tripId, Long routeId, Map<String, Object> clientContext,
+                                               List<AiConversationMessage> history) {
         try {
             Response<ApiResponse<AiAssistantResponse>> response =
-                    api.aiSummary(new AiSummaryRequest(tripId, routeId, clientContext)).execute();
+                    api.aiSummary(new AiSummaryRequest(tripId, routeId, clientContext, history)).execute();
             return parseAi(response);
         } catch (IOException exception) {
             return Result.error("Không kết nối được máy chủ AI (" + exception.getClass().getSimpleName()
                     + "). Kiểm tra mạng hoặc Render đang ngủ.");
         }
+    }
+
+    private AiAssistantRequest request(Long tripId, Long routeId, String question,
+                                       Map<String, Object> context, List<AiConversationMessage> history) {
+        AiAssistantRequest request = new AiAssistantRequest(tripId, routeId, question, context);
+        request.setConversationHistory(history);
+        return request;
     }
 
     private Result<AiAssistantResponse> parseAi(Response<ApiResponse<AiAssistantResponse>> response) {

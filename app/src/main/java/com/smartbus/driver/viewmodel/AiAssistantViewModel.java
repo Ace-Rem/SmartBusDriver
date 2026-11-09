@@ -8,6 +8,7 @@ import androidx.lifecycle.MutableLiveData;
 import com.smartbus.driver.SmartBusApp;
 import com.smartbus.driver.model.AiAssistantResponse;
 import com.smartbus.driver.model.AiMessage;
+import com.smartbus.driver.model.AiConversationMessage;
 import com.smartbus.driver.model.TripModel;
 import com.smartbus.driver.repository.AiRepository;
 import com.smartbus.driver.repository.DriverAiContextProvider;
@@ -76,7 +77,7 @@ public class AiAssistantViewModel extends AndroidViewModel {
                 failChat("Cần chọn tuyến hoặc có chuyến đang chạy để hỏi AI");
                 return;
             }
-            Result<AiAssistantResponse> result = aiRepository.chat(resolvedTripId, routeId, trimmed, localContext);
+            Result<AiAssistantResponse> result = aiRepository.chat(resolvedTripId, routeId, trimmed, localContext, conversationHistory());
             if (result.isSuccess() && result.getData() != null
                     && result.getData().getAnswer() != null
                     && !result.getData().getAnswer().isBlank()) {
@@ -107,7 +108,7 @@ public class AiAssistantViewModel extends AndroidViewModel {
                 failChat("Cần chọn tuyến hoặc có chuyến đang chạy để tóm tắt");
                 return;
             }
-            Result<AiAssistantResponse> result = aiRepository.summary(resolvedTripId, routeId, localContext);
+            Result<AiAssistantResponse> result = aiRepository.summary(resolvedTripId, routeId, localContext, conversationHistory());
             if (result.isSuccess() && result.getData() != null
                     && result.getData().getAnswer() != null
                     && !result.getData().getAnswer().isBlank()) {
@@ -209,6 +210,18 @@ public class AiAssistantViewModel extends AndroidViewModel {
     private void failChat(String message) {
         appendMessage(new AiMessage(AiMessage.TYPE_ASSISTANT, message));
         chatState.postValue(UiState.error(message));
+    }
+
+    private synchronized List<AiConversationMessage> conversationHistory() {
+        List<AiConversationMessage> result = new ArrayList<>();
+        List<AiMessage> current = messages.getValue();
+        if (current == null) return result;
+        int start = Math.max(0, current.size() - 12);
+        for (int i = start; i < current.size(); i++) {
+            AiMessage message = current.get(i);
+            result.add(new AiConversationMessage(message.isUser() ? "user" : "assistant", message.getText()));
+        }
+        return result;
     }
 
     private synchronized void appendMessage(AiMessage message) {

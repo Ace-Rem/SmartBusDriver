@@ -97,7 +97,7 @@ public final class DriverAiContextProvider {
         for (PassengerRecordEntity record : records) {
             int count = Math.max(0, record.passengerCount);
             total += count;
-            if ("ON_BOARD".equals(record.status)) {
+            if ("ON_BOARD".equals(record.status) || "ON_BOARD_UPDATE".equals(record.status)) {
                 onboard += count;
                 onboardGroups++;
             }

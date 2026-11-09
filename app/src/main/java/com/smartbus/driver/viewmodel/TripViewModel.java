@@ -10,6 +10,7 @@ import androidx.lifecycle.MutableLiveData;
 import com.smartbus.driver.SmartBusApp;
 import com.smartbus.driver.bluetooth.DriverBlePayload;
 import com.smartbus.driver.bluetooth.DriverBluetoothManager;
+import com.smartbus.driver.lan.LocalLanCheckInServer;
 import com.smartbus.driver.gps.GpsManager;
 import com.smartbus.driver.model.DashboardState;
 import com.smartbus.driver.model.BoardingRequestModel;
@@ -54,17 +55,21 @@ public class TripViewModel extends AndroidViewModel {
     private final DriverAiContextSyncManager aiContextSyncManager;
     private final GpsManager gpsManager;
     private final DriverBluetoothManager bluetoothManager;
+    private final LocalLanCheckInServer lanCheckInServer;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final ExecutorService fastSignalExecutor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean locationUpdateInFlight = new AtomicBoolean(false);
     private final AtomicBoolean fastSignalPollInFlight = new AtomicBoolean(false);
+    private static final long FAST_SIGNAL_POLL_INTERVAL_MS = 300L;
+    private static final long FAST_SIGNAL_FULL_RECONCILE_INTERVAL_MS = 15_000L;
     private volatile Double pendingLatitude;
     private volatile Double pendingLongitude;
     private volatile Double pendingDropoffLatitude;
     private volatile Double pendingDropoffLongitude;
     private volatile long lastFastSignalId;
     private volatile long lastFastSignalCancellationId;
+    private volatile long lastFastSignalFullReconcileAt;
     private Long fastSignalRouteId;
     private boolean fastSignalPolling;
     private final Runnable fastSignalPollRunnable = this::pollFastBoardingSignals;
@@ -101,6 +106,7 @@ public class TripViewModel extends AndroidViewModel {
         fastBoardingSignalRepository = new FastBoardingSignalRepository();
         gpsManager = new GpsManager(application);
         bluetoothManager = new DriverBluetoothManager(application);
+        lanCheckInServer = new LocalLanCheckInServer();
     }
 
     public LiveData<UiState<DashboardState>> getDashboardState() {
@@ -213,7 +219,7 @@ public class TripViewModel extends AndroidViewModel {
                             ? state.getCurrentStop().getId()
                             : null;
                     for (PassengerRecordModel record : passengers.getData()) {
-                        if ("ON_BOARD".equals(record.getStatus()) && record.getPassengerCount() != null) {
+                        if (isOnBoardStatus(record.getStatus()) && record.getPassengerCount() != null) {
                             total += record.getPassengerCount();
                             if (currentStopId != null && currentStopId.equals(record.getStopId())) {
                                 alighting += record.getPassengerCount();
@@ -236,7 +242,8 @@ public class TripViewModel extends AndroidViewModel {
                 } else {
                     state.setNotification("Chuyến đang chạy");
                 }
-                mainHandler.post(this::startBleScanning);
+                mainHandler.post(this::startBleAdvertising);
+                mainHandler.post(this::startLanCheckInServer);
                 mainHandler.post(this::startFastSignalPolling);
             } else {
                 state.setGpsStatus(gpsManager.hasLocationPermission() ? "Đã sẵn sàng" : "Cần quyền vị trí");
@@ -272,7 +279,8 @@ public class TripViewModel extends AndroidViewModel {
                 actionState.postValue(UiState.success(result.getData(), "Đã bắt đầu chuyến"));
                 mainHandler.post(() -> {
                     startGpsTracking();
-                    startBleScanning();
+                    startBleAdvertising();
+                    startLanCheckInServer();
                     // The server check-in channel must start with the trip;
                     // waiting for a dashboard reload can miss the signal TTL.
                     startFastSignalPolling();
@@ -290,7 +298,8 @@ public class TripViewModel extends AndroidViewModel {
             if (result.isSuccess()) {
                 actionState.postValue(UiState.success(result.getData(), "Đã kết thúc chuyến"));
                 loadDashboard(false);
-                stopBleScanning();
+                stopBleAdvertising();
+                stopLanCheckInServer();
                 executor.execute(tripRepository::syncPendingTrips);
             } else {
                 actionState.postValue(UiState.error(result.getMessage()));
@@ -301,7 +310,8 @@ public class TripViewModel extends AndroidViewModel {
 
     private void clearActiveTripLocally(String notification) {
         stopGpsTracking();
-        stopBleScanning();
+        stopBleAdvertising();
+        stopLanCheckInServer();
         stopFastSignalPolling();
         DashboardState next = new DashboardState();
         DashboardState previous;
@@ -393,7 +403,8 @@ public class TripViewModel extends AndroidViewModel {
         }
         boardingRequestsState.postValue(UiState.success(null));
         dashboardState.postValue(UiState.success(state));
-        mainHandler.post(this::startBleScanning);
+        mainHandler.post(this::startBleAdvertising);
+        mainHandler.post(this::startLanCheckInServer);
         mainHandler.post(this::startFastSignalPolling);
     }
 
@@ -429,7 +440,7 @@ public class TripViewModel extends AndroidViewModel {
             int alighting = 0;
             if (passengers.isSuccess() && passengers.getData() != null) {
                 for (PassengerRecordModel record : passengers.getData()) {
-                    if ("ON_BOARD".equals(record.getStatus()) && record.getPassengerCount() != null) {
+                    if (isOnBoardStatus(record.getStatus()) && record.getPassengerCount() != null) {
                         total += record.getPassengerCount();
                         if (currentStopId != null && currentStopId.equals(record.getStopId())) {
                             alighting += record.getPassengerCount();
@@ -485,7 +496,7 @@ public class TripViewModel extends AndroidViewModel {
             gpsMessage.setValue("Hãy bắt đầu chuyến trước khi quét hành khách.");
             return;
         }
-        gpsMessage.setValue("Đang quét check-in BLE của hành khách cho tuyến #"
+        gpsMessage.setValue("Đang mở BLE peripheral nhận check-in của hành khách cho tuyến #"
                 + snapshot.getTrip().getRouteId());
     }
 
@@ -493,7 +504,8 @@ public class TripViewModel extends AndroidViewModel {
         if (!getCurrentDashboard().hasActiveTrip()) {
             return;
         }
-        startBleScanning();
+        startBleAdvertising();
+        startLanCheckInServer();
     }
 
     public void confirmBoardingRequest(long requestId) {
@@ -505,14 +517,15 @@ public class TripViewModel extends AndroidViewModel {
             Long routeId = snapshot == null || snapshot.getTrip() == null
                     ? null : snapshot.getTrip().getRouteId();
             Long signalId = passengerRecordRepository.fastSignalId(requestId);
+            String lanRequestId = passengerRecordRepository.lanRequestId(requestId);
             PassengerRecordModel pendingRecord = passengerRecordRepository.getById(requestId);
-            if (tripId != null && routeId != null && pendingRecord != null
-                    && pendingRecord.getPassengerIdentifier() != null) {
-                Result<?> accepted = signalId != null
-                        ? fastBoardingSignalRepository.accept(
-                                signalId, tripId, routeId, pendingRecord.getPassengerIdentifier())
-                        : fastBoardingSignalRepository.acceptByIdentity(
-                                tripId, routeId, pendingRecord.getPassengerIdentifier());
+            // BLE and direct LAN records are local check-ins. Only the
+            // fallback Fast Signal path needs a server acceptance before the
+            // local +1 operation; LAN gets a direct local status callback.
+            if (signalId != null && tripId != null && routeId != null
+                    && pendingRecord != null && pendingRecord.getPassengerIdentifier() != null) {
+                Result<?> accepted = fastBoardingSignalRepository.accept(
+                        signalId, tripId, routeId, pendingRecord.getPassengerIdentifier());
                 if (!accepted.isSuccess()) {
                     actionState.postValue(UiState.error(
                             accepted.getMessage() == null
@@ -524,6 +537,16 @@ public class TripViewModel extends AndroidViewModel {
             }
             Result<PassengerRecordModel> result = passengerRecordRepository.confirmLocalBoarding(requestId);
             if (result.isSuccess()) {
+                if (lanRequestId != null && tripId != null && routeId != null
+                        && pendingRecord != null) {
+                    lanCheckInServer.sendAcceptance(
+                            lanRequestId,
+                            tripId,
+                            routeId,
+                            pendingRecord.getBoardingStopId(),
+                            pendingRecord.getDestinationStopId(),
+                            "BOARDED");
+                }
                 actionState.postValue(UiState.success(null, "Đã xác nhận hành khách lên xe"));
                 refreshPassengerTotal();
                 refreshBoardingRequests();
@@ -714,7 +737,7 @@ public class TripViewModel extends AndroidViewModel {
         Double nearestLongitude = null;
         float nearestMeters = Float.MAX_VALUE;
         for (PassengerRecordModel record : records) {
-            if (!"ON_BOARD".equals(record.getStatus())
+            if (!isOnBoardStatus(record.getStatus())
                     || record.getDestinationLatitude() == null
                     || record.getDestinationLongitude() == null
                     || record.getPassengerCount() == null) {
@@ -793,13 +816,13 @@ public class TripViewModel extends AndroidViewModel {
         state.setNotification("Gần nhất: " + nearest.getName() + " — tiếp theo: " + nextName);
     }
 
-    private void startBleScanning() {
+    private void startBleAdvertising() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(this::startBleScanning);
+            mainHandler.post(this::startBleAdvertising);
             return;
         }
         try {
-            bluetoothManager.startScanning(new DriverBluetoothManager.Listener() {
+            bluetoothManager.startAdvertising(new DriverBluetoothManager.Listener() {
                 @Override
                 public void onPayload(DriverBlePayload payload) {
                     handleBlePayload(payload);
@@ -807,11 +830,11 @@ public class TripViewModel extends AndroidViewModel {
 
                 @Override
                 public void onMessage(String message) {
-                    gpsMessage.postValue(message);
+                    publishBleMessage(message);
                 }
             });
         } catch (RuntimeException exception) {
-            gpsMessage.postValue("Không khởi động được BLE scan: " + exception.getMessage());
+            publishBleMessage("Không khởi động được BLE peripheral: " + exception.getMessage());
         }
     }
 
@@ -830,12 +853,45 @@ public class TripViewModel extends AndroidViewModel {
             fastSignalRouteId = routeId;
             lastFastSignalId = 0L;
             lastFastSignalCancellationId = 0L;
+            lastFastSignalFullReconcileAt = 0L;
         }
         if (fastSignalPolling) {
             return;
         }
         fastSignalPolling = true;
         mainHandler.post(fastSignalPollRunnable);
+    }
+
+    private void startLanCheckInServer() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::startLanCheckInServer);
+            return;
+        }
+        DashboardState snapshot = getCurrentDashboard();
+        if (snapshot == null || !snapshot.hasActiveTrip()
+                || snapshot.getTrip().getRouteId() == null) {
+            return;
+        }
+        long routeId = snapshot.getTrip().getRouteId();
+        try {
+            lanCheckInServer.start(routeId, new LocalLanCheckInServer.Listener() {
+                @Override
+                public void onPayload(DriverBlePayload payload, String requestId,
+                                      String passengerIdentifier, Long boardingStopId,
+                                      String sourceAddress) {
+                    handleLanPayload(payload, requestId, passengerIdentifier,
+                            boardingStopId, sourceAddress);
+                }
+
+                @Override
+                public void onMessage(String message) {
+                    publishDriverMessage(message);
+                }
+            });
+        } catch (RuntimeException exception) {
+            publishDriverMessage("Không khởi động được nhận check-in LAN: "
+                    + (exception.getMessage() == null ? "lỗi socket." : exception.getMessage()));
+        }
     }
 
     private void stopFastSignalPolling() {
@@ -848,6 +904,7 @@ public class TripViewModel extends AndroidViewModel {
         fastSignalRouteId = null;
         lastFastSignalId = 0L;
         lastFastSignalCancellationId = 0L;
+        lastFastSignalFullReconcileAt = 0L;
     }
 
     private void pollFastBoardingSignals() {
@@ -864,22 +921,35 @@ public class TripViewModel extends AndroidViewModel {
         long targetTripId = snapshot.getTrip().getId();
         long routeId = snapshot.getTrip().getRouteId();
         if (!fastSignalPollInFlight.compareAndSet(false, true)) {
-            mainHandler.postDelayed(fastSignalPollRunnable, 1_000L);
+            mainHandler.postDelayed(fastSignalPollRunnable, FAST_SIGNAL_POLL_INTERVAL_MS);
             return;
         }
         fastSignalExecutor.execute(() -> {
             boolean changed = false;
+            long pollStartedAt = System.currentTimeMillis();
+            boolean fullReconcile = pollStartedAt - lastFastSignalFullReconcileAt
+                    >= FAST_SIGNAL_FULL_RECONCILE_INTERVAL_MS;
+            long pollAfterId = fullReconcile ? 0L : lastFastSignalId;
             try {
-                // Fetch the complete short-lived pending set so Room can also
-                // reconcile requests that were cancelled before this app's
-                // current cursor, not only newly appended events.
+                // Incremental polling keeps the normal path small. A periodic
+                // full poll still cleans up expired pending signals.
                 Result<List<FastBoardingSignalModel>> result =
-                        fastBoardingSignalRepository.poll(routeId, 0L);
+                        fastBoardingSignalRepository.poll(routeId, pollAfterId);
                 if (result.isSuccess() && result.getData() != null) {
                     List<Long> activeSignalIds = new ArrayList<>();
+                    if (fullReconcile) {
+                        lastFastSignalFullReconcileAt = pollStartedAt;
+                    }
                     for (FastBoardingSignalModel signal : result.getData()) {
-                        if (signal == null || signal.getId() == null
-                                || signal.getRouteId() == null
+                        if (signal == null || signal.getId() == null) {
+                            continue;
+                        }
+                        boolean newSignal = signal.getId() > lastFastSignalId;
+                        // Advance even for a signal that cannot belong to the
+                        // current local trip, otherwise it is re-read every
+                        // second until the server TTL expires.
+                        lastFastSignalId = Math.max(lastFastSignalId, signal.getId());
+                        if (signal.getRouteId() == null
                                 || !Long.valueOf(routeId).equals(signal.getRouteId())
                                 || (signal.getTripId() != null
                                 && !Long.valueOf(targetTripId).equals(signal.getTripId())
@@ -888,7 +958,9 @@ public class TripViewModel extends AndroidViewModel {
                             continue;
                         }
                         activeSignalIds.add(signal.getId());
-                        if (signal.getId() <= lastFastSignalId) continue;
+                        if (!newSignal) {
+                            continue;
+                        }
                         DashboardState current = getCurrentDashboard();
                         if (current == null || current.getTrip() == null
                                 || !current.hasActiveTrip()
@@ -905,16 +977,19 @@ public class TripViewModel extends AndroidViewModel {
                                 "Backend fast signal route=" + signal.getRouteId()
                                         + " destinationStop=" + signal.getDestinationStopId()
                         );
-                        // Advance the cursor for every valid event, including an
-                        // idempotent event already present in Room, so one old
-                        // signal cannot block later signal batches.
-                        lastFastSignalId = Math.max(lastFastSignalId, signal.getId());
-                        if (local.isSuccess()) {
+                        boolean duplicate = local.isSuccess() && local.getMessage() != null
+                                && (local.getMessage().contains("đã được ghi nhận")
+                                || local.getMessage().contains("đã ghi nhận"));
+                        if (local.isSuccess() && !duplicate) {
                             changed = true;
+                            publishDriverMessage("Đã nhận yêu cầu lên xe từ server: bến xuống #"
+                                    + signal.getDestinationStopId());
                         }
                     }
-                    passengerRecordRepository.removePendingFastSignalsNotIn(
-                            targetTripId, activeSignalIds);
+                    if (fullReconcile) {
+                        passengerRecordRepository.removePendingFastSignalsNotIn(
+                                targetTripId, activeSignalIds);
+                    }
                 }
                 // Render new requests as soon as the pending-signal poll
                 // finishes. Cancellation cleanup is secondary and must never
@@ -946,7 +1021,7 @@ public class TripViewModel extends AndroidViewModel {
             } finally {
                 fastSignalPollInFlight.set(false);
                 if (fastSignalPolling) {
-                    mainHandler.postDelayed(fastSignalPollRunnable, 1_000L);
+                    mainHandler.postDelayed(fastSignalPollRunnable, FAST_SIGNAL_POLL_INTERVAL_MS);
                 }
             }
         });
@@ -956,60 +1031,163 @@ public class TripViewModel extends AndroidViewModel {
         return tripId < 0L || tripId >= 1_000_000_000_000L;
     }
 
-    private void stopBleScanning() {
+    private void stopBleAdvertising() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(this::stopBleScanning);
+            mainHandler.post(this::stopBleAdvertising);
             return;
         }
         try {
-            bluetoothManager.stopScanning();
+            bluetoothManager.stopAdvertising();
         } catch (RuntimeException exception) {
-            gpsMessage.postValue("Không dừng được BLE scan: " + exception.getMessage());
+            gpsMessage.postValue("Không dừng được BLE peripheral: " + exception.getMessage());
         }
     }
 
+    private void stopLanCheckInServer() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::stopLanCheckInServer);
+            return;
+        }
+        lanCheckInServer.stop();
+    }
+
     private void handleBlePayload(DriverBlePayload payload) {
+        handleCheckInPayload(payload, "BLE",
+                payload == null ? null : payload.getSourceDeviceAddress(),
+                payload == null ? null : payload.getPassengerIdentifier(),
+                null, null);
+    }
+
+    private void handleLanPayload(
+            DriverBlePayload payload,
+            String requestId,
+            String passengerIdentifier,
+            Long boardingStopId,
+            String sourceAddress
+    ) {
+        handleCheckInPayload(payload, "LAN", requestId, passengerIdentifier,
+                boardingStopId, sourceAddress);
+    }
+
+    private void handleCheckInPayload(
+            DriverBlePayload payload,
+            String channel,
+            String sourceId,
+            String passengerIdentifier,
+            Long boardingStopId,
+            String sourceAddress
+    ) {
         if (payload == null) {
             return;
         }
+        String channelLabel = "BLE".equals(channel) ? "BLE" : "LAN";
         DashboardState snapshot = getCurrentDashboard();
         if (snapshot == null || snapshot.getTrip() == null || snapshot.getTrip().getId() == null) {
+            publishDriverMessage("Đã bắt được " + channelLabel
+                    + " nhưng Driver chưa có chuyến đang chạy để đối chiếu.");
             return;
         }
         Long currentRouteId = snapshot.getTrip().getRouteId();
         if (currentRouteId == null || payload.getRouteId() == null
                 || !payload.getRouteId().equals(currentRouteId)) {
+            publishDriverMessage("Đã bắt được " + channelLabel
+                    + " nhưng bỏ qua: mã tuyến không trùng tuyến hiện tại.");
+            return;
+        }
+        List<StopModel> stops = cachedStops;
+        boolean validStop = false;
+        if (stops != null) {
+            for (StopModel stop : stops) {
+                if (stop != null && payload.getDestinationStopId() != null
+                        && payload.getDestinationStopId().equals(stop.getId())
+                        && currentRouteId.equals(stop.getRouteId())) {
+                    validStop = true;
+                    break;
+                }
+            }
+        }
+        if (!validStop) {
+            publishDriverMessage("Đã bắt được " + channelLabel
+                    + " nhưng bỏ qua: bến xuống không thuộc dữ liệu offline của tuyến.");
             return;
         }
         long targetTripId = snapshot.getTrip().getId();
+        String destinationName = "Bến xuống #" + payload.getDestinationStopId();
+        if (stops != null) {
+            for (StopModel stop : stops) {
+                if (stop != null && payload.getDestinationStopId().equals(stop.getId())
+                        && stop.getName() != null && !stop.getName().isBlank()) {
+                    destinationName = stop.getName();
+                    break;
+                }
+            }
+        }
+        final String receivedDestinationName = destinationName;
         executor.execute(() -> {
-            String note = "BLE check-in route=" + payload.getRouteId()
+            String note = channelLabel + " check-in route=" + payload.getRouteId()
                     + " destinationStop=" + payload.getDestinationStopId();
-            Result<PassengerRecordModel> result = passengerRecordRepository.createFromBle(
+            Result<PassengerRecordModel> result = "BLE".equals(channel)
+                    ? passengerRecordRepository.createFromBle(
                     targetTripId,
                     payload.getDestinationStopId(),
-                    payload.getDestinationLatitude(),
-                    payload.getDestinationLongitude(),
-                    payload.getPassengerIdentifier(),
-                    note
-            );
+                    sourceId,
+                    passengerIdentifier,
+                    note)
+                    : passengerRecordRepository.createFromLan(
+                    targetTripId,
+                    boardingStopId,
+                    payload.getDestinationStopId(),
+                    sourceId,
+                    passengerIdentifier,
+                    note);
             if (result.isSuccess()) {
-                refreshBoardingRequests();
-                pushAiContextInBackground();
-                gpsMessage.postValue(result.getMessage() != null
-                        ? result.getMessage()
-                        : "Đã nhận yêu cầu check-in BLE.");
+                boolean duplicate = result.getMessage() != null
+                        && (result.getMessage().contains("đã được ghi nhận")
+                        || result.getMessage().contains("đã ghi nhận"));
+                if (!duplicate) {
+                    refreshBoardingRequests();
+                    pushAiContextInBackground();
+                    boolean alreadyCounted = result.getMessage() != null
+                            && result.getMessage().contains("đã lên xe");
+                    publishDriverMessage(alreadyCounted
+                            ? "Đã cập nhật bến xuống là " + receivedDestinationName
+                            + " của hành khách đã lên xe; không cộng thêm khách."
+                            : "1 khách mới với bến xuống là " + receivedDestinationName
+                            + ". Bấm Thêm vào để cộng +1 khách.");
+                }
             } else {
-                gpsMessage.postValue(result.getMessage());
+                publishDriverMessage("Đã bắt được " + channelLabel
+                        + " nhưng không tạo được yêu cầu lên xe: "
+                        + (result.getMessage() == null ? "lỗi lưu dữ liệu offline." : result.getMessage()));
             }
         });
+    }
+
+    private void publishBleMessage(String message) {
+        publishDriverMessage(message);
+    }
+
+    private boolean isOnBoardStatus(String status) {
+        return "ON_BOARD".equals(status) || "ON_BOARD_UPDATE".equals(status);
+    }
+
+    private void publishDriverMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return;
+        }
+        gpsMessage.postValue(message);
+        synchronized (dashboardLock) {
+            currentDashboard.setNotification(message);
+            dashboardState.postValue(UiState.success(currentDashboard));
+        }
     }
 
     @Override
     protected void onCleared() {
         super.onCleared();
         stopGpsTracking();
-        stopBleScanning();
+        stopBleAdvertising();
+        stopLanCheckInServer();
         stopFastSignalPolling();
         executor.shutdownNow();
         fastSignalExecutor.shutdownNow();

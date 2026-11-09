@@ -49,29 +49,80 @@ public class PassengerRecordRepository {
         return Result.success(local);
     }
 
-    public Result<PassengerRecordModel> createFromBle(
+    public synchronized Result<PassengerRecordModel> createFromBle(
             long tripId,
             Long destinationStopId,
-            Double destinationLatitude,
-            Double destinationLongitude,
+            String sourceDeviceAddress,
+            String note
+    ) {
+        return createFromBle(tripId, destinationStopId, sourceDeviceAddress, null, note);
+    }
+
+    public synchronized Result<PassengerRecordModel> createFromBle(
+            long tripId,
+            Long destinationStopId,
+            String sourceDeviceAddress,
             String passengerIdentifier,
             String note
     ) {
-        if (passengerIdentifier == null || passengerIdentifier.isBlank()) {
-            return Result.error("BLE payload thiếu mã hành khách/thiết bị.");
+        if (sourceDeviceAddress == null || sourceDeviceAddress.isBlank()) {
+            return Result.error("BLE không xác định được thiết bị gửi.");
         }
-        String idempotencyKey = tripId + ":ble:" + passengerIdentifier;
+        // BLE and Fast Signal are intentionally sent in parallel. If the
+        // server signal already created the pending request, the GATT write
+        // must not create a second passenger row.
+        // The address is connection metadata, not part of the two-field BLE
+        // payload. It prevents write retries from creating duplicate records.
+        String idempotencyKey = tripId + ":ble:" + sourceDeviceAddress;
         PassengerRecordEntity existing = passengerRecordDao.findByTripAndIdempotencyKey(tripId, idempotencyKey);
         if (existing != null) {
-            return Result.success(EntityMapper.toPassengerRecordModel(existing), "Hành khách đã được ghi nhận trước đó.");
+            // The BLE address stays stable when the same passenger edits the
+            // selected stop. It is only a duplicate when the destination is
+            // unchanged; otherwise update this same passenger row.
+            return updateExistingCheckIn(existing, null, destinationStopId,
+                    "BLE", idempotencyKey, note, false);
+        }
+        if (passengerIdentifier != null && !passengerIdentifier.isBlank()) {
+            existing = passengerRecordDao.findActiveByPassengerIdentifier(
+                    tripId, passengerIdentifier);
+            if (existing != null) {
+                return updateExistingCheckIn(existing, null, destinationStopId,
+                        "BLE", idempotencyKey, note, false);
+            }
+        }
+        PassengerRecordEntity backendExisting = passengerRecordDao
+                .findPendingByTripAndDestinationAndSource(tripId, destinationStopId, "BACKEND_FAST");
+        if (backendExisting != null) {
+            if (passengerIdentifier != null && !passengerIdentifier.isBlank()) {
+                backendExisting.passengerIdentifier = passengerIdentifier;
+                passengerRecordDao.upsert(backendExisting);
+            }
+            return Result.success(EntityMapper.toPassengerRecordModel(backendExisting),
+                    "Hành khách đã được ghi nhận từ server.");
+        }
+        PassengerRecordEntity lanExisting = passengerRecordDao
+                .findPendingByTripAndDestinationAndSource(tripId, destinationStopId, "LAN");
+        if (lanExisting != null) {
+            if (passengerIdentifier != null && !passengerIdentifier.isBlank()) {
+                lanExisting.passengerIdentifier = passengerIdentifier;
+                passengerRecordDao.upsert(lanExisting);
+            }
+            return Result.success(EntityMapper.toPassengerRecordModel(lanExisting),
+                    "Hành khách đã được ghi nhận từ LAN.");
+        }
+        existing = passengerRecordDao.findActiveByPassengerIdentifier(tripId, sourceDeviceAddress);
+        if (existing != null) {
+            return updateExistingCheckIn(existing, null, destinationStopId,
+                    "BLE", idempotencyKey, note, false);
         }
         PassengerRecordModel local = createLocal(
                 tripId,
                 null,
                 destinationStopId,
-                destinationLatitude,
-                destinationLongitude,
-                passengerIdentifier,
+                null,
+                null,
+                passengerIdentifier == null || passengerIdentifier.isBlank()
+                        ? sourceDeviceAddress : passengerIdentifier,
                 1,
                 "PENDING",
                 note,
@@ -81,7 +132,71 @@ public class PassengerRecordRepository {
         return Result.success(local);
     }
 
-    public Result<PassengerRecordModel> createFromFastSignal(
+    /**
+     * Records a LAN check-in using the same local pending-row model as BLE.
+     * requestId is transport metadata for retry deduplication; the business
+     * data has already been reduced to routeId + destinationStopId before this
+     * method is called.
+     */
+    public synchronized Result<PassengerRecordModel> createFromLan(
+            long tripId,
+            Long boardingStopId,
+            Long destinationStopId,
+            String requestId,
+            String passengerIdentifier,
+            String note
+    ) {
+        if (requestId == null || requestId.isBlank()) {
+            return Result.error("LAN không có mã yêu cầu để chống ghi nhận trùng.");
+        }
+        String idempotencyKey = tripId + ":lan:" + requestId;
+        PassengerRecordEntity existing = passengerRecordDao.findByTripAndIdempotencyKey(
+                tripId, idempotencyKey);
+        if (existing != null) {
+            // A passenger keeps the same local request id across edits. Do
+            // not let that idempotency key hide a changed boarding/alighting
+            // selection.
+            return updateExistingCheckIn(existing, boardingStopId, destinationStopId,
+                    "LAN", idempotencyKey, note, boardingStopId != null);
+        }
+        String identity = passengerIdentifier == null || passengerIdentifier.isBlank()
+                ? "LAN-" + requestId : passengerIdentifier;
+        existing = passengerRecordDao.findActiveByPassengerIdentifier(tripId, identity);
+        if (existing != null) {
+            return updateExistingCheckIn(existing, boardingStopId, destinationStopId,
+                    "LAN", idempotencyKey, note, boardingStopId != null);
+        }
+        // Compatibility fallback for an older Passenger build that does not
+        // send a stable identity in its LAN envelope.
+        PassengerRecordEntity pendingSameDestination = passengerRecordDao
+                .findPendingByTripAndDestination(tripId, destinationStopId);
+        if (pendingSameDestination != null) {
+            return Result.success(EntityMapper.toPassengerRecordModel(pendingSameDestination),
+                    "Hành khách đã được ghi nhận trước đó.");
+        }
+        PassengerRecordEntity bleExisting = passengerRecordDao
+                .findPendingByTripAndDestinationAndSource(tripId, destinationStopId, "BLE");
+        if (bleExisting != null) {
+            return Result.success(EntityMapper.toPassengerRecordModel(bleExisting),
+                    "Hành khách đã được ghi nhận từ BLE.");
+        }
+        PassengerRecordModel local = createLocal(
+                tripId,
+                boardingStopId,
+                destinationStopId,
+                null,
+                null,
+                identity,
+                1,
+                "PENDING",
+                note,
+                "LAN",
+                idempotencyKey
+        );
+        return Result.success(local);
+    }
+
+    public synchronized Result<PassengerRecordModel> createFromFastSignal(
             long tripId,
             long signalId,
             Long destinationStopId,
@@ -90,7 +205,7 @@ public class PassengerRecordRepository {
         return createFromFastSignal(tripId, signalId, null, destinationStopId, null, note);
     }
 
-    public Result<PassengerRecordModel> createFromFastSignal(
+    public synchronized Result<PassengerRecordModel> createFromFastSignal(
             long tripId,
             long signalId,
             Long boardingStopId,
@@ -106,14 +221,26 @@ public class PassengerRecordRepository {
                 idempotencyKey
         );
         if (existing == null && passengerIdentifier != null && !passengerIdentifier.isBlank()) {
-            existing = passengerRecordDao.findPendingByPassengerIdentifier(
-                    tripId, passengerIdentifier, destinationStopId);
+            existing = passengerRecordDao.findActiveByPassengerIdentifier(tripId, passengerIdentifier);
             if (existing != null) {
-                existing.idempotencyKey = idempotencyKey;
-                existing.source = "BACKEND_FAST";
-                existing.boardingStopId = boardingStopId;
-                existing.destinationStopId = destinationStopId;
-                passengerRecordDao.upsert(existing);
+                existing.passengerIdentifier = identifier;
+                return updateExistingCheckIn(existing, boardingStopId, destinationStopId,
+                        "BACKEND_FAST", idempotencyKey, note, boardingStopId != null);
+            }
+        }
+        if (existing == null) {
+            // If BLE arrived first, promote that pending local row to the
+            // server idempotency key when the matching Fast Signal arrives.
+            existing = passengerRecordDao.findPendingByTripAndDestinationAndSource(
+                    tripId, destinationStopId, "BLE");
+            if (existing == null) {
+                existing = passengerRecordDao.findPendingByTripAndDestinationAndSource(
+                        tripId, destinationStopId, "LAN");
+            }
+            if (existing != null) {
+                existing.passengerIdentifier = identifier;
+                return updateExistingCheckIn(existing, boardingStopId, destinationStopId,
+                        "BACKEND_FAST", idempotencyKey, note, boardingStopId != null);
             }
         }
         if (existing != null) {
@@ -136,6 +263,49 @@ public class PassengerRecordRepository {
                 idempotencyKey
         );
         return Result.success(local, "Đã nhận yêu cầu lên xe.");
+    }
+
+    private Result<PassengerRecordModel> updateExistingCheckIn(
+            PassengerRecordEntity existing,
+            Long boardingStopId,
+            Long destinationStopId,
+            String source,
+            String idempotencyKey,
+            String note,
+            boolean boardingProvided
+    ) {
+        boolean sameDestination = java.util.Objects.equals(
+                existing.destinationStopId, destinationStopId);
+        boolean sameBoarding = !boardingProvided || java.util.Objects.equals(
+                existing.boardingStopId, boardingStopId);
+        if (sameDestination && sameBoarding) {
+            return Result.success(EntityMapper.toPassengerRecordModel(existing),
+                    "Hành khách đã được ghi nhận trước đó.");
+        }
+        if (boardingProvided) {
+            existing.boardingStopId = boardingStopId;
+        }
+        existing.stopId = destinationStopId;
+        existing.destinationStopId = destinationStopId;
+        existing.source = source;
+        existing.note = note;
+        // An already-counted passenger stays counted. The special status makes
+        // the changed destination visible as one update request without adding
+        // another passenger when the driver confirms it.
+        boolean alreadyCounted = "ON_BOARD".equals(existing.status)
+                || "ON_BOARD_UPDATE".equals(existing.status);
+        if (alreadyCounted) {
+            // Keep the original backend idempotency key so confirming an
+            // updated passenger cannot create a second server-side passenger.
+            existing.status = "ON_BOARD_UPDATE";
+        } else {
+            existing.idempotencyKey = idempotencyKey;
+        }
+        passengerRecordDao.upsert(existing);
+        return Result.success(EntityMapper.toPassengerRecordModel(existing),
+                alreadyCounted
+                        ? "Đã cập nhật bến của hành khách đã lên xe."
+                        : "Đã cập nhật yêu cầu lên xe của hành khách.");
     }
 
     private PassengerRecordModel createLocal(
@@ -206,6 +376,23 @@ public class PassengerRecordRepository {
                     entity.passengerIdentifier = local.passengerIdentifier;
                     entity.source = local.source;
                     entity.idempotencyKey = local.idempotencyKey;
+                    // The server may return the original idempotent record
+                    // when an already-counted passenger changes stops. Keep
+                    // the locally validated offline selection as the current
+                    // display value instead of reverting to the old stop.
+                    if (local.boardingStopId != null) {
+                        entity.boardingStopId = local.boardingStopId;
+                    }
+                    if (local.destinationStopId != null) {
+                        entity.stopId = local.stopId;
+                        entity.destinationStopId = local.destinationStopId;
+                    }
+                    if (local.destinationLatitude != null) {
+                        entity.destinationLatitude = local.destinationLatitude;
+                    }
+                    if (local.destinationLongitude != null) {
+                        entity.destinationLongitude = local.destinationLongitude;
+                    }
                     entity.pendingSync = false;
                     if (local.id < 0) {
                         passengerRecordDao.deleteById(local.id);
@@ -270,24 +457,20 @@ public class PassengerRecordRepository {
     }
 
     public int getCachedPassengerTotal(long tripId) {
-        return passengerRecordDao.sumPassengerCountByStatus(tripId, "ON_BOARD");
+        return passengerRecordDao.sumPassengerCountOnBoard(tripId);
     }
 
     public int getCachedAlightingTotal(long tripId, long destinationStopId) {
-        return passengerRecordDao.sumPassengerCountByDestinationAndStatus(tripId, destinationStopId, "ON_BOARD");
+        return passengerRecordDao.sumPassengerCountOnBoardByDestination(tripId, destinationStopId);
     }
 
     public int getCachedAlightingTotal(long tripId, double latitude, double longitude) {
-        return passengerRecordDao.sumPassengerCountByDestinationCoordinatesAndStatus(
-                tripId,
-                latitude,
-                longitude,
-                "ON_BOARD"
-        );
+        return passengerRecordDao.sumPassengerCountOnBoardByDestinationCoordinates(
+                tripId, latitude, longitude);
     }
 
     public List<BoardingRequestModel> getLocalBoardingRequests(long tripId) {
-        return toBoardingRequests(passengerRecordDao.findByTripIdAndStatus(tripId, "PENDING"));
+        return toBoardingRequests(passengerRecordDao.findBoardingRequests(tripId));
     }
 
     public Result<PassengerRecordModel> confirmLocalBoarding(long recordId) {
@@ -330,6 +513,18 @@ public class PassengerRecordRepository {
         }
     }
 
+    public String lanRequestId(long recordId) {
+        PassengerRecordEntity entity = passengerRecordDao.findById(recordId);
+        if (entity == null || entity.idempotencyKey == null) {
+            return null;
+        }
+        String prefix = entity.tripId + ":lan:";
+        if (!entity.idempotencyKey.startsWith(prefix)) {
+            return null;
+        }
+        return entity.idempotencyKey.substring(prefix.length());
+    }
+
     public void removePendingFastSignal(long tripId, long signalId) {
         passengerRecordDao.deletePendingByTripAndIdempotencyKey(
                 tripId, tripId + ":fast:" + signalId);
@@ -363,12 +558,8 @@ public class PassengerRecordRepository {
     }
 
     public void markDroppedOffByCoordinates(long tripId, double latitude, double longitude) {
-        List<PassengerRecordEntity> records = passengerRecordDao.findByDestinationCoordinatesAndStatus(
-                tripId,
-                latitude,
-                longitude,
-                "ON_BOARD"
-        );
+        List<PassengerRecordEntity> records = passengerRecordDao.findOnBoardByDestinationCoordinates(
+                tripId, latitude, longitude);
         if (records == null) {
             return;
         }

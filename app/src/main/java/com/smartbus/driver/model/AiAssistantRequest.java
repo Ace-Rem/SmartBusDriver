@@ -1,6 +1,7 @@
 package com.smartbus.driver.model;
 
 import java.util.Map;
+import java.util.List;
 
 public class AiAssistantRequest {
 
@@ -8,6 +9,7 @@ public class AiAssistantRequest {
     private Long routeId;
     private String question;
     private Map<String, Object> clientContext;
+    private List<AiConversationMessage> conversationHistory;
 
     public AiAssistantRequest() {
     }
@@ -54,4 +56,7 @@ public class AiAssistantRequest {
     public void setClientContext(Map<String, Object> clientContext) {
         this.clientContext = clientContext;
     }
+
+    public List<AiConversationMessage> getConversationHistory() { return conversationHistory; }
+    public void setConversationHistory(List<AiConversationMessage> conversationHistory) { this.conversationHistory = conversationHistory; }
 }

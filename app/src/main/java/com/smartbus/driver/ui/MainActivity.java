@@ -44,7 +44,8 @@ public class MainActivity extends AppCompatActivity {
                 boolean granted = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION))
                         || Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
                 boolean bluetoothGranted = android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S
-                        || Boolean.TRUE.equals(result.get(Manifest.permission.BLUETOOTH_SCAN));
+                        || (Boolean.TRUE.equals(result.get(Manifest.permission.BLUETOOTH_ADVERTISE))
+                        && Boolean.TRUE.equals(result.get(Manifest.permission.BLUETOOTH_CONNECT)));
                 if (granted) {
                     if (tripViewModel.getCurrentDashboard().hasActiveTrip()) {
                         tripViewModel.startGpsTracking();
@@ -57,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
                     showLocationPermissionDeniedDialog();
                 } else if (!bluetoothGranted && tripViewModel.getCurrentDashboard().hasActiveTrip()) {
                     com.google.android.material.snackbar.Snackbar
-                            .make(binding.getRoot(), "Chưa có quyền Bluetooth scan nên chưa nhận check-in BLE.", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                            .make(binding.getRoot(), "Chưa có quyền Bluetooth advertise/connect nên chưa nhận check-in BLE.", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
                             .show();
                 }
             });
@@ -301,8 +302,10 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean hasBluetoothScanPermission() {
         return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S
-                || ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
-                == PackageManager.PERMISSION_GRANTED;
+                || (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE)
+                == PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
+                == PackageManager.PERMISSION_GRANTED);
     }
 
     private String[] requiredRuntimePermissions() {
@@ -310,7 +313,7 @@ public class MainActivity extends AppCompatActivity {
             return new String[]{
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION,
-                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_ADVERTISE,
                     Manifest.permission.BLUETOOTH_CONNECT
             };
         }
